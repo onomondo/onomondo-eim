@@ -1,0 +1,45 @@
+% Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
+
+-module(utils).
+-export([binary_to_hex/1, hex_to_binary/1]).
+
+% Converts a single hex digit (e.g. <<"A">>) into its integer representation.
+hexstr_digit_to_int(HexDigit) ->
+    [HexDigitInt] = HexDigit,
+    HexDigitIntCap = HexDigitInt bor 32,
+    case HexDigitIntCap of
+	48 -> 0;
+	49 -> 1;
+	50 -> 2;
+	51 -> 3;
+	52 -> 4;
+	53 -> 5;
+	54 -> 6;
+	55 -> 7;
+	56 -> 8;
+	57 -> 9;
+	97 -> 10;
+	98 -> 11;
+	99 -> 12;
+       100 -> 13;
+       101 -> 14;
+       102 -> 15
+    end.
+
+% Converts a single hex octet (e.g. <<"1A">>) into its integer representation.
+hexstr_octet_to_int(HexOctet) ->
+    HexDigits = [ [X] || <<X:8>> <= HexOctet],
+    HexDigitsInt = [ hexstr_digit_to_int(X) || X <- HexDigits],
+    [HexOctetIntH | T ] = HexDigitsInt,
+    [HexOctetIntL | _ ] = T,
+    HexOctetIntH * 16 + HexOctetIntL.
+
+% Converts a binary into a printable hex-string (also a binary).
+binary_to_hex(Binary) ->
+    EncList = [io_lib:format("~2.16.0b",[X]) || <<X:8>> <= Binary ],
+    list_to_binary(string:join(io_lib:format("~s", [EncList]), "")).
+
+% Converts a printable hex-string (int the form of a binary) to a binary.
+hex_to_binary(HexStr) ->
+    OctetsStr = [<<X:16>> || <<X:16>> <= HexStr],
+    list_to_binary([ hexstr_octet_to_int(X) || X <- OctetsStr]).

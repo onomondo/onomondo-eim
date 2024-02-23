@@ -1,0 +1,4 @@
+-name onomondo_eim@127.0.0.1
+-setcookie onomondo_eim
+-mnesia dir '"./db"'
+-heart
