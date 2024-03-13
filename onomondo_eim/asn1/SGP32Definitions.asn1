@@ -144,7 +144,7 @@ SequenceNumber ::= [0] INTEGER
 
 -- Section 2.11.2.1
 -- ASN1START
-EuiccPackageResult ::= [81] CHOICE { -- Tag 'BF51' #SupportedForPsmoV1.0.0#
+EuiccPackageResult ::= CHOICE { -- Tag 'BF51' #SupportedForPsmoV1.0.0#
   euiccPackageResultSigned EuiccPackageResultSigned,
   euiccPackageErrorSigned EuiccPackageErrorSigned,
   euiccPackageErrorUnsigned EuiccPackageErrorUnsigned
@@ -429,7 +429,7 @@ SGP32-RetrieveNotificationsListRequest ::= [43] SEQUENCE { -- Tag 'BF2B'
 }
 
 -- ASN1START
-SGP32-RetrieveNotificationsListResponse ::= [43] CHOICE { -- Tag 'BF2B'
+SGP32-RetrieveNotificationsListResponse ::= CHOICE { -- Tag 'BF2B'
   notificationList SEQUENCE OF SGP32-PendingNotification,
   notificationsListResultError INTEGER { undefinedError(127)},
   euiccPackageResultList SEQUENCE OF EuiccPackageResult,
