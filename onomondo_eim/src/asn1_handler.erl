@@ -179,7 +179,6 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 	NotifStateChg = maps:is_key(notifyStateChange, EsipaReq),
 	io:format("notifyStateChange: ~p~n", [NotifStateChg]),
 
-
     % setup ESipa response message
     % TODO: Besides profileDownloadTriggerRequest, there is also euiccPackageRequest, ipaEuiccDataRequest, and
     % eimAcknowledgements.
@@ -188,6 +187,26 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 		    {download, Order} ->
 			{[{<<"activationCode">>, ActivationCode}]} = Order,
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
+		    {psmo, Order} ->
+			% Convert Order to PSMO list
+			Order2Psmo = fun(PsmoOrder) ->
+					      case PsmoOrder of
+						  {[{<<"psmo">>,<<"enable">>},{<<"iccid">>,Iccid},{<<"rollback">>, true}]} ->
+						      {enable, #{iccid => utils:hex_to_binary(Iccid), rollbackFlag => null}};
+						  {[{<<"psmo">>,<<"enable">>},{<<"iccid">>,Iccid},{<<"rollback">>, false}]} ->
+						      {enable, #{iccid => utils:hex_to_binary(Iccid)}}
+					      end
+				      end,
+			PsmoList = [Order2Psmo(O) || O <- Order ],
+
+			% Format Esipa message
+			EuiccPackage = {psmoList, PsmoList},
+			EuiccPackageSigned = #{eimId => <<"myEIM">>, %TODO: from where do we get this id?
+					       eidValue => EidValue,
+					       counterValue => 0, % TODO: pick a suitable value (how?)
+					       transactionId => <<1,2,3,4>>, %TODO: generate a random transaction id (and store it?)
+					       euiccPackage => EuiccPackage},
+			{euiccPackageRequest, #{euiccPackageSigned => EuiccPackageSigned, eimSignature => <<0,0,0>>}};
 		    none ->
 			{eimPackageError, noEimPackageAvailable};
 		    _ ->
@@ -198,7 +217,10 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 	{getEimPackageResponse, EsipaResp};
 
 %GSMA SGP.32, section 6.3.2.7
-handle_asn1(_Req0, _State, {provideEimPackageResult, _AsnReq}) ->
+handle_asn1(Req0, _State, {provideEimPackageResult, _AsnReq}) ->
+    %TODO: take the euiccPackageResult from the response and pass it to work_finish. Unfortunately we cannot pass it
+    %directly. We first must transcode it ito something the jiffy JSON encoder can understand.
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, "TODO:Put euiccPackageResult here"),
 	{provideEimPackageResultResponse, undefined};
 
 %Unsupported request
