@@ -7,6 +7,7 @@ import json
 import requests
 
 DOWNLOAD_DEFAULT='{ "eidValue" : "89882119900000000000000000000005", "order" : {"activationCode" : "1$testsmdpplus1.example.com$OPxLD-UVRuC-jysPI-YkOwT"}}'
+PSMO_DEFAULT='{ "eidValue" : "89882119900000000000000000000005", "order" : [{"psmo" : "enable", "iccid" : "98001032547698103285", "rollback" : false }]}'
 
 def rest_create(host, facility, Json):
     r = requests.post("http://" + str(host) + "/" + str(facility) + "/create", json=Json)
@@ -33,16 +34,23 @@ def main(argv):
     parser.add_argument("-d", "--delete", action='store_true', default=False)
     parser.add_argument("-t", "--list", action='store_true', default=False)
     parser.add_argument("-r", "--resource-id")
-    parser.add_argument("-j", "--json", default=DOWNLOAD_DEFAULT)
+    parser.add_argument("-j", "--json")
 
     args = parser.parse_args()
 
     if args.create:
         print("create on: " + str(args.host))
         print(" facility: " + str(args.facility))
-        print(" json: " + str(args.json))
+        if args.json:
+            args_json = str(args.json)
+        else:
+            if args.facility == "download":
+                args_json = DOWNLOAD_DEFAULT
+            elif args.facility == "psmo":
+                args_json = PSMO_DEFAULT
+        print(" json: " + args_json)
         print("result:")
-        rest_create(args.host, args.facility, json.loads(args.json))
+        rest_create(args.host, args.facility, json.loads(args_json))
     elif args.lookup:
         print("lookup on: " + str(args.host))
         print(" facility: " + str(args.facility))
