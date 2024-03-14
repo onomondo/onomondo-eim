@@ -112,9 +112,13 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
     CancelSessionReq = maps:get(cancelSessionResponse, EsipaReq),
     Es9Req = case CancelSessionReq of
 		 {cancelSessionResponseOk, CancelSessionRespOk} ->
-		     {cancelSessionResponseOk, CancelSessionRespOk};
+		     {cancelSessionRequestEs9,
+		      #{transactionId => maps:get(transactionId, EsipaReq),
+			cancelSessionResponse => {cancelSessionResponseOk, CancelSessionRespOk}}};
 		 {cancelSessionResponseError, CancelSessionRespErr} ->
-		     {cancelSessionResponseError, CancelSessionRespErr};
+		     {cancelSessionRequestEs9,
+		      #{transactionId => maps:get(transactionId, EsipaReq),
+			cancelSessionResponse => {cancelSessionResponseError, CancelSessionRespErr}}};
 		 {compactCancelSessionResponseOk, _CompactCancelSessionReq} ->
 		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
 	     end,
@@ -235,6 +239,8 @@ encode_eim_to_ipa({initiateAuthenticationResponseEsipa, EimToIpaChoice}) ->
     'SGP32Definitions':encode('InitiateAuthenticationResponseEsipa', EimToIpaChoice);
 encode_eim_to_ipa({getBoundProfilePackageResponseEsipa, EimToIpaChoice}) ->
     'SGP32Definitions':encode('GetBoundProfilePackageResponseEsipa', EimToIpaChoice);
+encode_eim_to_ipa({cancelSessionResponseEsipa, EimToIpaChoice}) ->
+    'SGP32Definitions':encode('CancelSessionResponseEsipa', EimToIpaChoice);
 encode_eim_to_ipa(emptyResponse) ->
     {ok, <<>>};
 encode_eim_to_ipa(EimToIpa) ->
