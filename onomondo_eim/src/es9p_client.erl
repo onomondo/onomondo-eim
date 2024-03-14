@@ -15,8 +15,12 @@ make_req_json(BaseUrl, Function, JsonBody) ->
     URL = list_to_binary(string:join(["https://", binary_to_list(BaseUrl), "/gsma/rsp2/es9plus/", Function], "")),
     ReqHeaders = [ {<<"Content-Type">>, <<"application/json;charset=UTF-8">>},
 		   {<<"X-Admin-Protocol">>, <<"gsma/rsp/v2.1.0">>} ],
+    % Add a request header (see also: GSMA SGP.22 6.5.1.3)
+    {ok, Hostname} = inet:gethostname(),
+    JsonBodyWithHdr = JsonBody#{<<"header">> => #{<<"functionRequesterIdentifier">> => list_to_binary(Hostname),
+						  <<"functionCallIdentifier">> => list_to_binary(pid_to_list(self()))}},
     % construct body from encoded json
-    ReqBody = jiffy:encode(JsonBody, [force_utf8]),
+    ReqBody = jiffy:encode(JsonBodyWithHdr, [force_utf8]),
     % TODO: actually verify the certificate by providing custom root CA Cert
     SslOptions = [ {verify, verify_none} ],
     Options = [ {ssl_options, SslOptions}, with_body ],
