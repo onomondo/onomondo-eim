@@ -94,8 +94,7 @@ request_json({initiateAuthenticationRequest, InitAuthReq}, BaseUrl) ->
 
     {ok, _HtppStatus, JsonResp} = make_req_json(BaseUrl, "initiateAuthentication", Json),
     Choice = case JsonResp of
-		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> :=
-									    <<"Executed-Success">>}}} ->
+		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
 		     R = #{transactionId => utils:hex_to_binary(maps:get(<<"transactionId">>, JsonResp)),
 			   serverSigned1 => rsp_dec_b64_asn1('ServerSigned1', maps:get(<<"serverSigned1">>, JsonResp)),
 			   serverSignature1 => base64:decode(maps:get(<<"serverSignature1">>, JsonResp)),
@@ -117,8 +116,7 @@ request_json({authenticateClientRequest, AuthClientReq}, BaseUrl) ->
 								  maps:get(authenticateServerResponse, AuthClientReq))},
     {ok, _HtppStatus, JsonResp} = make_req_json(BaseUrl, "authenticateClient", Json),
     Choice = case JsonResp of
-		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> :=
-									    <<"Executed-Success">>}}} ->
+		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
 		     R = #{transactionId => utils:hex_to_binary(maps:get(<<"transactionId">>, JsonResp)),
 			   profileMetaData => rsp_dec_b64_asn1('StoreMetadataRequest', maps:get(<<"profileMetadata">>, JsonResp)),
 			   smdpSigned2 => rsp_dec_b64_asn1('SmdpSigned2', maps:get(<<"smdpSigned2">>, JsonResp)),
@@ -137,8 +135,7 @@ request_json({getBoundProfilePackageRequest, GetBppReq}, BaseUrl) ->
 	     <<"prepareDownloadResponse">> => rsp_enc_asn1_b64('PrepareDownloadResponse', maps:get(prepareDownloadResponse, GetBppReq))},
     {ok, _HtppStatus, JsonResp} = make_req_json(BaseUrl, "getBoundProfilePackage", Json),
     Choice = case JsonResp of
-		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> :=
-									    <<"Executed-Success">>}}} ->
+		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
 		     R = #{transactionId => utils:hex_to_binary(maps:get(<<"transactionId">>, JsonResp)),
 			   boundProfilePackage => rsp_dec_b64_asn1('BoundProfilePackage', maps:get(<<"boundProfilePackage">>, JsonResp))},
 		     {getBoundProfilePackageOk, R};
