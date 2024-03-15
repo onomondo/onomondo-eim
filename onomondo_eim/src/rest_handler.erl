@@ -78,10 +78,10 @@ get_rest_lookup(Req, State, Facility) ->
 		       % Here a "resource" refers to the parameters that the REST API user has originally submitted
 		       % during create. We will only read from the resource but not alter it.
 		       Resource = {[{<<"eidValue">>, EidValue}, {<<"order">>, Order}]},
-		       io_lib:format("{\"status\": \"~p\", \"timestamp\": \"~p\", \"resource\": ~s, \"outcome\": ~s}",
+		       io_lib:format("{\"status\": \"~p\", \"timestamp\": \"~p\", \"resource\": ~s, \"outcome\": \"~s\"}",
 				     [Status, Timestamp,
 				      binary_to_list(jiffy:encode(Resource)),
-				      binary_to_list(jiffy:encode(Outcome))]);
+				      binary_to_list(utils:binary_to_hex(term_to_binary(Outcome)))]);
 		   none -> "{\"status\": \"absent\"}";
 		   _ -> "{\"status\": \"error\"}"
 	       end,

@@ -5,25 +5,31 @@ import sys
 import argparse
 import json
 import requests
+import erlang
+import pprint
 
 DOWNLOAD_DEFAULT='{ "eidValue" : "89882119900000000000000000000005", "order" : {"activationCode" : "1$testsmdpplus1.example.com$OPxLD-UVRuC-jysPI-YkOwT"}}'
 PSMO_DEFAULT='{ "eidValue" : "89882119900000000000000000000005", "order" : [{"psmo" : "enable", "iccid" : "98001032547698103285", "rollback" : false }]}'
 
+def h2b(s) -> bytearray:
+    """convert from a string of hex nibbles to a sequence of bytes"""
+    return bytes.fromhex(s)
+
 def rest_create(host, facility, Json):
     r = requests.post("http://" + str(host) + "/" + str(facility) + "/create", json=Json)
-    print(" resource URL: " + str(r.url))
+    return "resource URL: " + str(r.url)
 
 def rest_lookup(host, facility, ResourceId):
     r = requests.get("http://" + str(host) + "/" + str(facility) + "/lookup/" + str(ResourceId))
-    print(r.json())
+    return r.json()
 
 def rest_delete(host, facility, ResourceId):
     r = requests.get("http://" + str(host) + "/" + str(facility) + "/delete/" + str(ResourceId))
-    print(r.json())
+    return r.json()
 
 def rest_list(host, facility):
     r = requests.get("http://" + str(host) + "/" + str(facility) + "/list/")
-    print(r.json())
+    return r.json()
 
 def main(argv):
     parser = argparse.ArgumentParser(prog='restop', description='utility to operate on the REST API of onomondo_eim')
@@ -50,24 +56,30 @@ def main(argv):
                 args_json = PSMO_DEFAULT
         print(" json: " + args_json)
         print("result:")
-        rest_create(args.host, args.facility, json.loads(args_json))
+        print(rest_create(args.host, args.facility, json.loads(args_json)))
     elif args.lookup:
         print("lookup on: " + str(args.host))
         print(" facility: " + str(args.facility))
         print(" resourceId: " + str(args.resource_id))
-        print("result:")
-        rest_lookup(args.host, args.facility, args.resource_id)
+        result = rest_lookup(args.host, args.facility, args.resource_id)
+        print("json-result:" + str(result))
+        outcome_hexstr=result['outcome']
+        outcome_bytes=h2b(outcome_hexstr)
+        outcome_term=erlang.binary_to_term(outcome_bytes)
+        pp = pprint.PrettyPrinter(depth=4)
+        outcome_pretty = pp.pformat(outcome_term)
+        print("decoded outcome: " + str(outcome_pretty))
     elif args.delete:
         print("delete on: " + str(args.host))
         print(" facility: " + str(args.facility))
         print(" resourceId: " + str(args.resource_id))
         print("result:")
-        rest_delete(args.host, args.facility, args.resource_id)
+        print(rest_delete(args.host, args.facility, args.resource_id))
     elif args.list:
         print("list on: " + str(args.host))
         print(" facility: " + str(args.facility))
         print("result:")
-        rest_list(args.host, args.facility)
+        print(rest_list(args.host, args.facility))
 
 
 

@@ -130,7 +130,7 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
     % CancelSessionResponseEsipa and CancelSessionResponseEs9 share the exact same definition, so we may convert
     % without an extra case statement.
 
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), canceled, "TODO:Put cancelSessionResponse here"),
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), canceled, EsipaReq),
     {cancelSessionResponseEsipa, Es9Resp};
 
 %GSMA SGP.32, section 6.3.2.4
@@ -166,7 +166,7 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 
     % There is no response defined for this function (see also SGP.32, section 6.3.2.4), so we send just an empty
     % response (0 bytes of data)
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, "TODO"),
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, EsipaReq),
     emptyResponse;
 
 %GSMA SGP.32, section 6.3.2.6
@@ -212,10 +212,8 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
     {getEimPackageResponse, EsipaResp};
 
 %GSMA SGP.32, section 6.3.2.7
-handle_asn1(Req0, _State, {provideEimPackageResult, _AsnReq}) ->
-    %TODO: take the euiccPackageResult from the response and pass it to work_finish. Unfortunately we cannot pass it
-    %directly. We first must transcode it ito something the jiffy JSON encoder can understand.
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, "TODO:Put euiccPackageResult here"),
+handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, EsipaReq),
     {provideEimPackageResultResponse, undefined};
 
 %Unsupported request
