@@ -30,11 +30,30 @@ start(_Type, _Args) ->
     ]),
     {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
     {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
-    {ok, _} = cowboy:start_clear(http_listener_esipa,
-				 [{ip, EsipaIp}, {port, EsipaPort}],
-				 #{env => #{dispatch => Dispatch_ESipa,
-					    middlewares => [cowboy_router, eim_esipa_middleware, cowboy_handler]}}
-				),
+    {ok, EsipaSslDisable} = application:get_env(onomondo_eim, esipa_ssl_disable),
+    {ok, EsipaSslCert} = application:get_env(onomondo_eim, esipa_ssl_cert),
+    {ok, EsipaSslKey} = application:get_env(onomondo_eim, esipa_ssl_key),
+    case EsipaSslDisable of
+	true ->
+	    logger:notice("Starting ESipa HTTP server at ~p:~p...~n", [EsipaIp, EsipaPort]),
+	    {ok, _} = cowboy:start_clear(http_listener_esipa,
+					 [{ip, EsipaIp},
+					  {port, EsipaPort}],
+					 #{env => #{dispatch => Dispatch_ESipa,
+						    middlewares => [cowboy_router, eim_esipa_middleware, cowboy_handler]}}
+					);
+	_ ->
+	    logger:notice("Starting ESipa HTTPs server at ~p:~p...~ncertificate: ~p~nkey: ~p~n",
+			  [EsipaIp, EsipaPort, EsipaSslCert, EsipaSslKey]),
+	    {ok, _} = cowboy:start_tls(https_listener_esipa,
+				       [{ip, EsipaIp},
+					{port, EsipaPort},
+					{certfile, EsipaSslCert},
+					{keyfile, EsipaSslKey}],
+				       #{env => #{dispatch => Dispatch_ESipa,
+						  middlewares => [cowboy_router, eim_esipa_middleware, cowboy_handler]}}
+				      )
+    end,
 
     % Startup REST server
     Dispatch_REST = cowboy_router:compile([
@@ -58,8 +77,10 @@ start(_Type, _Args) ->
     ]),
     {ok, RestIp} = application:get_env(onomondo_eim, rest_ip),
     {ok, RestPort} = application:get_env(onomondo_eim, rest_port),
+    logger:notice("Starting REST HTTP server at ~p:~p...~n", [RestIp, RestPort]),
     {ok, _} = cowboy:start_clear(http_listener_rest,
-				 [{ip, RestIp}, {port, RestPort}],
+				 [{ip, RestIp},
+				  {port, RestPort}],
 				 #{env => #{dispatch => Dispatch_REST}}
 				),
 
