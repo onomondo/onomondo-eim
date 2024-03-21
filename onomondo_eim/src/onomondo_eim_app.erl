@@ -9,6 +9,9 @@
 start(_Type, _Args) ->
     logger:notice("eIM!"),
 
+    % Startup database
+    ok = mnesia_db:init(),
+
     Dispatch_ESipa = cowboy_router:compile([
         {'_', [
 	       % SGP.32 Section 6.4.1
@@ -53,7 +56,6 @@ start(_Type, _Args) ->
     ]),
     {ok, RestIp} = application:get_env(onomondo_eim, rest_ip),
     {ok, RestPort} = application:get_env(onomondo_eim, rest_port),
-    ok = mnesia_db:init(),
     {ok, _} = cowboy:start_clear(http_listener_rest,
 				 [{ip, RestIp}, {port, RestPort}],
 				 #{env => #{dispatch => Dispatch_REST}}
