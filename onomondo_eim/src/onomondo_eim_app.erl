@@ -22,8 +22,10 @@ start(_Type, _Args) ->
                {"/gsma/rsp2/asn1", esipa_handler, []}
               ]}
     ]),
+    {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
+    {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
     {ok, _} = cowboy:start_clear(http_listener_esipa,
-				 [{port, 8000}], %TODO: make port user configurable
+				 [{ip, EsipaIp}, {port, EsipaPort}],
 				 #{env => #{dispatch => Dispatch_ESipa,
 					    middlewares => [cowboy_router, eim_esipa_middleware, cowboy_handler]}}
 				),
@@ -47,11 +49,11 @@ start(_Type, _Args) ->
                {"/eco/list/", rest_handler, [eco, list]}
               ]}
     ]),
-
+    {ok, RestIp} = application:get_env(onomondo_eim, rest_ip),
+    {ok, RestPort} = application:get_env(onomondo_eim, rest_port),
     ok = mnesia_db:init(),
-
     {ok, _} = cowboy:start_clear(http_listener_rest,
-				 [{port, 8080}], %TODO: make port user configurable
+				 [{ip, RestIp}, {port, RestPort}],
 				 #{env => #{dispatch => Dispatch_REST}}
 				),
 
