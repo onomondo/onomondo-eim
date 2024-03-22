@@ -16,8 +16,8 @@ make_req_json(BaseUrl, Function, JsonBody) ->
     ReqHeaders = [ {<<"Content-Type">>, <<"application/json;charset=UTF-8">>},
 		   {<<"X-Admin-Protocol">>, <<"gsma/rsp/v2.1.0">>} ],
     % Add a request header (see also: GSMA SGP.22 6.5.1.3)
-    {ok, Hostname} = inet:gethostname(),
-    JsonBodyWithHdr = JsonBody#{<<"header">> => #{<<"functionRequesterIdentifier">> => list_to_binary(Hostname),
+    {ok, EimId} = application:get_env(onomondo_eim, eim_id),
+    JsonBodyWithHdr = JsonBody#{<<"header">> => #{<<"functionRequesterIdentifier">> => list_to_binary(EimId),
 						  <<"functionCallIdentifier">> => list_to_binary(pid_to_list(self()))}},
     % construct body from encoded json
     ReqBody = jiffy:encode(JsonBodyWithHdr, [force_utf8]),
