@@ -221,6 +221,9 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.7
 handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
+    % TODO: Evaluate the contents of the EimPackageResult. This result may contain either results intended for the eIM
+    % only, but it also may contain results/notifications intended to be forwarded to the SMDP+. We may forward those
+    % results/notification to the SMDP+ in a similar way like we already do it in handleNotificationEsipa.
     ok = mnesia_db:work_finish(maps:get(pid, Req0), success, EsipaReq),
     {provideEimPackageResultResponse, undefined};
 
