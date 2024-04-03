@@ -10,7 +10,7 @@
 -export([rest_list/1, rest_lookup/2, rest_create/3, rest_delete/2]).
 
 % work functions, to be called by the eIM code (from inside)
--export([work_fetch/2, work_pickup/1, work_putdown/2, work_finish/3]).
+-export([work_fetch/2, work_pickup/1, work_update/2, work_finish/3]).
 
 % debugging
 -export([dump_rest/0, dump_work/0]).
@@ -222,7 +222,9 @@ work_pickup(Pid) ->
 	    error
     end.
 
-work_putdown(Pid, State) ->
+% Update a work item that is in progress. This fuction updates the state (any user defined term) of the work item.
+% This function can be called any time after work_fetch was called before. It can also be called multiple times.
+work_update(Pid, State) ->
     Trans = fun() ->
 		    Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
 		    Rows = qlc:e(Q),
@@ -240,10 +242,10 @@ work_putdown(Pid, State) ->
     {atomic , Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("Work: putting down work item: Pid=~p, State=~p", [Pid, State]),
+	    logger:notice("Work: updating work item: Pid=~p, State=~p", [Pid, State]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot put work item down, database error: Pid=~p, State=~p", [Pid, State]),
+	    logger:error("Work: cannot update, database error: Pid=~p, State=~p", [Pid, State]),
 	    error
 	end.
 

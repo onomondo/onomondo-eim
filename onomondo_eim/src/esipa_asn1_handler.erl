@@ -18,7 +18,7 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
     {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
     BaseUrl = maps:get(smdpAddress, EsipaReq),
     NewWorkState = WorkState#{smdpAddress => BaseUrl},
-    mnesia_db:work_putdown(maps:get(pid, Req0), NewWorkState),
+    mnesia_db:work_update(maps:get(pid, Req0), NewWorkState),
 
     % setup ES9+ request message
     Es9Req = {initiateAuthenticationRequest, EsipaReq},
@@ -239,7 +239,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 		    _ ->
 			{eimPackageError, undefinedError}
 		end,
-    mnesia_db:work_putdown(maps:get(pid, Req0), #{}),
+    mnesia_db:work_update(maps:get(pid, Req0), #{}),
     {getEimPackageResponse, EsipaResp};
 
 %GSMA SGP.32, section 6.3.2.7
