@@ -10,13 +10,13 @@
 -export([rest_list/1, rest_lookup/2, rest_create/3, rest_delete/2]).
 
 % work functions, to be called by the eIM code (from inside)
--export([work_fetch/2, work_pickup/1, work_update/2, work_finish/3]).
+-export([work_fetch/2, work_pickup/1, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
 
 % debugging
 -export([dump_rest/0, dump_work/0]).
 
 -record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome:: binary()}).
--record(work, {pid :: pid(), resourceId :: binary(), order, state}).
+-record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), order, state}).
 
 %TODO: We need some mechanism that looks through the work table from time to time and checks the timestemp (field not
 %yet created in work) to find stuck work items. We also might also need a similar mechanism for the rest table that
@@ -204,7 +204,74 @@ work_fetch(EidValue, Pid) ->
 	    error
 	end.
 
-% Pickup a work item. This function can be called any time after work_fetch was called before.
+% Bind a work item to a TransactionId. The transactionId has to be a unique identifier that can be used as a secondary
+% key to find a work item in the databse. The binding works in two directions. The work item is first searched by its
+% pid, when found, the transactionId is updated. In case the pid has become invalid, then the work item is searched
+% again by the transactionId and when found, the pid is updated. This function can be called any time after work_fetch
+% was called before. It can also be called multiple times.
+work_bind(Pid, TransactionId) ->
+    % Transaction to update the TransactionId. This is the normal case. A work item starts without having a
+    % TransactionId assigned. As soon as a (new) TransactionId becomes known, it is updated using this Transaction.
+    TransUpdateTrnsId = fun() ->
+				Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
+				Rows = qlc:e(Q),
+				case Rows of
+				    [Row | _] ->
+					mnesia:write(Row#work{transactionId=TransactionId}),
+					ok;
+				    [] ->
+					none;
+				    _ ->
+					error
+				end
+			end,
+
+    % Transaction to update the PID. This is a corner case that comes into play in case the PID is lost (the
+    % process/connection handling this work item has died). We then try to find the work item by the TransactionId
+    % and update its PID.
+    TransUpdatePid = fun() ->
+			     Q = qlc:q([X || X <- mnesia:table(work), X#work.transactionId == TransactionId]),
+			     Rows = qlc:e(Q),
+			     case Rows of
+				 [Row | _] ->
+				     mnesia:write(Row#work{pid=Pid}),
+				     ok;
+				 [] ->
+				     none;
+				 _ ->
+				     error
+			     end
+		     end,
+
+    {atomic, Result} = mnesia:transaction(TransUpdateTrnsId),
+    case Result of
+        ok ->
+	    logger:notice("Work: bound work item to transactionId: Pid=~p, TransactionId=~p", [Pid, TransactionId]),
+	    ok;
+	none ->
+	    {atomic, UpdatePidResult} = mnesia:transaction(TransUpdatePid),
+	    case UpdatePidResult of
+		ok ->
+		    logger:notice("Work: bound work item to PID: Pid=~p, TransactionId=~p", [Pid, TransactionId]),
+
+		    ok;
+		none ->
+		    logger:error("Work: cannot bind work item, transactionId nor PID found: Pid=~p, TransactionId=~p",
+				 [Pid, TransactionId]),
+		    error;
+		_ ->
+		    logger:error("Work: cannot bind work item, database error: Pid=~p, TransactionId=~p, TransUpdatePid",
+				 [Pid, TransactionId]),
+		    error
+	    end;
+	_ ->
+	    logger:error("Work: cannot bind work item, database error: Pid=~p, TransactionId=~p, TransUpdateTrnsId",
+			 [Pid, TransactionId]),
+	    error
+    end.
+
+% Pickup a work item that is in progress. This function can be called any time after work_fetch was called
+% before. It can also be called multiple times.
 work_pickup(Pid) ->
     Trans = fun() ->
 		    Q = qlc:q([{X#work.order, X#work.state} || X <- mnesia:table(work), X#work.pid == Pid]),
@@ -221,6 +288,9 @@ work_pickup(Pid) ->
 	    logger:error("Work: cannot pick up work item, database error: Pid=~p", [Pid]),
 	    error
     end.
+work_pickup(Pid, TransactionId) ->
+    ok = work_bind(Pid, TransactionId),
+    work_pickup(Pid).
 
 % Update a work item that is in progress. This fuction updates the state (any user defined term) of the work item.
 % This function can be called any time after work_fetch was called before. It can also be called multiple times.

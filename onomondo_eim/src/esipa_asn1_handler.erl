@@ -30,7 +30,7 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
     EsipaResp = case Es9Resp of
 		    {initiateAuthenticationOk, InitAuthOk} ->
 			TransactionId = maps:get(transactionId, InitAuthOk),
-			io:format("====TransactionId===>~p~n", [TransactionId]),
+			mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
                         % TODO: InitiateAuthenticationOkEsipa has matchingId and ctxPrams1 as optional members. In case
                         % we are able to populate those fields from cached values, we should do so.
                         % maps:merge(InitAuthOk, #{matchingId => FIXME, ctxPrams1 => FIXME}),
@@ -42,23 +42,20 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.2
 handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
-    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+    TransactionId = maps:get(transactionId, EsipaReq),
+    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
     AuthServResp = maps:get(authenticateServerResponse, EsipaReq),
     Es9Req = case AuthServResp of
 		 {authenticateResponseOk, AuthRespOk} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {authenticateClientRequest,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseOk, AuthRespOk}}};
 		 {authenticateResponseError, AuthRespErr} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {authenticateClientRequest,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseError, AuthRespErr}}};
 		 {compactAuthenticateResponseOk, _compartAuthRespOk} ->
 		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
@@ -78,23 +75,20 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.3
 handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
-    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+    TransactionId = maps:get(transactionId, EsipaReq),
+    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
     PrepDwnldResp = maps:get(prepareDownloadResponse, EsipaReq),
     Es9Req = case PrepDwnldResp of
 		 {downloadResponseOk, DwnldRespOk} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {getBoundProfilePackageRequest,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			prepareDownloadResponse => {downloadResponseOk, DwnldRespOk}}};
 		 {downloadResponseError, DwnldRespErr} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {getBoundProfilePackageRequest,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			prepareDownloadResponse => {downloadResponseError, DwnldRespErr}}};
 		 {compactDownloadResponseOk, _CompactAuthRespOk} ->
 		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
@@ -115,23 +109,20 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.5
 handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
-    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+    TransactionId = maps:get(transactionId, EsipaReq),
+    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
     CancelSessionReq = maps:get(cancelSessionResponse, EsipaReq),
     Es9Req = case CancelSessionReq of
 		 {cancelSessionResponseOk, CancelSessionRespOk} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {cancelSessionRequestEs9,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			cancelSessionResponse => {cancelSessionResponseOk, CancelSessionRespOk}}};
 		 {cancelSessionResponseError, CancelSessionRespErr} ->
-		     TransactionId = maps:get(transactionId, EsipaReq),
-		     io:format("====TransactionId===>~p~n", [TransactionId]),
 		     {cancelSessionRequestEs9,
-		      #{transactionId => maps:get(transactionId, EsipaReq),
+		      #{transactionId => TransactionId,
 			cancelSessionResponse => {cancelSessionResponseError, CancelSessionRespErr}}};
 		 {compactCancelSessionResponseOk, _CompactCancelSessionReq} ->
 		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
@@ -149,9 +140,6 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.4
 handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
-    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
-    BaseUrl = maps:get(smdpAddress, WorkState),
-
     case EsipaReq of
 	{pendingNotification, PendingNotif} ->
 
@@ -162,7 +150,7 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 			     % exact same definition, so we may convert without an extra case statement.
 			     PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
 			     TransactionId = maps:get(transactionId, PrfleInstRsltData),
-			     io:format("====TransactionId===>~p~n", [TransactionId]),
+			     mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
 			     {handleNotification, #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}};
 			 {otherSignedNotification, OtherSignNotif} ->
 			     % TODO: An otherSignedNotification does not contain a TransactionId. However it contains
@@ -176,6 +164,8 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 		     end,
 
             % perform ES9+ request (We expect an empty response in this case)
+	    {_, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+	    BaseUrl = maps:get(smdpAddress, WorkState),
 	    {} = es9p_client:request_json(Es9Req, BaseUrl);
 
 	{provideEimPackageResult, _PrvdeEimPkgRslt} ->
