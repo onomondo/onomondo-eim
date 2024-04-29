@@ -43,7 +43,7 @@ make_req_asn1(BaseUrl, Asn1Body) ->
     % see SGP.22 Section 6.6 for details on HTTP Function Binding in ASN.1
     Method = post,
     % construct URL from global hostname, static path and function
-    URL = list_to_binary(string:join([BaseUrl, "/gsma/rsp2/asn1"], "")),
+    URL = list_to_binary(string:join(["https://", binary_to_list(BaseUrl), "/gsma/rsp2/asn1"], "")),
     ReqHeaders = [ {<<"Content-Type">>, <<"application/x-gsma-rsp-asn1">>},
 		   {<<"X-Admin-Protocol">>, <<"gsma/rsp/v2.1.0">>} ],
     % construct body from encoded ASN.1
