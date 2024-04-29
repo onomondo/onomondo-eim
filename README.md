@@ -45,7 +45,7 @@ cases those parameters do not have to be modified.
 * esipa_ssl_key: Configure the location of the SSL private key.
 * rest_ip: Configure on which network interface the REST API interface should listen.
 * rest_port: Configure the port number where the REST API interface should listen.
-* rest_port: Configure the eimId of the eIM instance.
+* eim_id: Configure the eimId of the eIM instance.
 
 ### vm.args
 
