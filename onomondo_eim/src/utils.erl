@@ -1,7 +1,7 @@
 % Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
 
 -module(utils).
--export([binary_to_hex/1, hex_to_binary/1]).
+-export([binary_to_hex/1, hex_to_binary/1, join_binary_list/1]).
 
 % Converts a single hex digit (e.g. <<"A">>) into its integer representation.
 hexstr_digit_to_int(HexDigit) ->
@@ -43,3 +43,17 @@ binary_to_hex(Binary) ->
 hex_to_binary(HexStr) ->
     OctetsStr = [<<X:16>> || <<X:16>> <= HexStr],
     list_to_binary([ hexstr_octet_to_int(X) || X <- OctetsStr]).
+
+% Joins (concatenates) a list of binaries into a single large binary
+join_binary_list([]) ->
+    % An empty list will result into an empty binary
+    <<>>;
+join_binary_list([Single]) ->
+    % A list that contains only of a single binary will result into that single binry.
+    Single;
+join_binary_list([H|T]) ->
+    % Lists with multiple binaries get joined into a single large binary
+    lists:foldl(fun (Binary, Joined) -> <<Joined/binary, Binary/binary>> end, H, T);
+join_binary_list(Binary) ->
+    % In case someone uses this function on a binary directly, we transparently return that binary.
+    Binary.
