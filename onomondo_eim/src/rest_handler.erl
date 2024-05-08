@@ -121,6 +121,8 @@ get_rest_info(Req, State) ->
     {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
     {ok, Hostname} = inet:gethostname(),
     {ok, Vsn} = application:get_key(onomondo_eim, vsn),
+    {ok, EsipaSslCertPath} = application:get_env(onomondo_eim, esipa_ssl_cert),
+    {ok, EsipaSslCertPem} = file:read_file(EsipaSslCertPath),
     InfoList = {[
 		  {hostname, list_to_binary(Hostname)},
 		  {node, node()},
@@ -128,9 +130,10 @@ get_rest_info(Req, State) ->
 		  {eim_id, list_to_binary(EimId)},
 		  {esipa_ip, list_to_binary(inet:ntoa(EsipaIp))},
 		  {esipa_port, EsipaPort},
+		  {esipa_ssl_cert, EsipaSslCertPem},
 		  {eim_configuration_data, eim_cfg:gen_eim_configuration_data()}
 		]},
-    Response = io_lib:format("{\"resource_id_list\": ~s}",
-			     [binary_to_list(jiffy:encode(InfoList))]),
+    InfoListJson = utils:join_binary_list(jiffy:encode(InfoList)),
+    Response = io_lib:format("{\"resource_id_list\": ~s}", [binary_to_list(InfoListJson)]),
     logger:notice("REST: responding to client: Response:~p", [list_to_binary(Response)]),
     {list_to_binary(Response), Req, State}.
