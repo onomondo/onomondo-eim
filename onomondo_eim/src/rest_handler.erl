@@ -59,7 +59,8 @@ post_rest_create(Req, State, Facility) ->
     logger:notice("REST: creating new REST resource: Resource=~p, Facility=~p", [Content, Facility]),
     ContentDecoded = jiffy:decode(Content),
     {[{<<"eidValue">>, EidValue}, _]} = ContentDecoded,
-    {[_, {<<"order">>, Order}]} = ContentDecoded,
+    OrderName = utils:join_binary_list([atom_to_binary(Facility), <<"_order">>]),
+    {[_, {OrderName, Order}]} = ContentDecoded,
     {ok, ResourceId} = mnesia_db:rest_create(Facility, EidValue, Order),
     case cowboy_req:method(Req1) of
         <<"POST">> ->
@@ -79,7 +80,8 @@ get_rest_lookup(Req, State, Facility) ->
 		   {Status, Timestamp, EidValue, Order, Outcome} ->
 		       % Here a "resource" refers to the parameters that the REST API user has originally submitted
 		       % during create. We will only read from the resource but not alter it.
-		       Resource = {[{<<"eidValue">>, EidValue}, {<<"order">>, Order}]},
+		       Resource = {[{<<"eidValue">>, EidValue},
+				    {utils:join_binary_list([atom_to_binary(Facility), <<"_order">>]), Order}]},
 		       io_lib:format("{\"status\": \"~p\", \"timestamp\": \"~p\", \"resource\": ~s, \"outcome\": \"~s\"}",
 				     [Status, Timestamp,
 				      binary_to_list(jiffy:encode(Resource)),

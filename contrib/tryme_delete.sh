@@ -1,7 +1,7 @@
 #!/bin/bash
 . ./tryme.cfg
 
-JSON='{ "eidValue" : "'$EID'", "order" : [{"psmo" : "delete", "iccid" : "'$ICCID'"}]}'
+JSON='{ "eidValue" : "'$EID'", "psmo_order" : [{"psmo" : "delete", "iccid" : "'$ICCID'"}]}'
 RC=`./restop.py -c -f psmo -j "$JSON"`
 echo $RC
 
