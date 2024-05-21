@@ -3,9 +3,9 @@
 -module(eim_cfg).
 
 -include_lib("public_key/include/public_key.hrl").
--export([gen_eim_configuration_data/0]).
+-export([gen_eim_configuration_data/1]).
 
-gen_eim_configuration_data() ->
+gen_eim_configuration_data(Style) ->
     {ok, EimId} = application:get_env(onomondo_eim, eim_id),
     {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
     {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
@@ -24,5 +24,14 @@ gen_eim_configuration_data() ->
     EimConfigurationDataList = [EimConfigurationData],
     GetEimConfigurationDataResponse = #{eimConfigurationDataList => EimConfigurationDataList},
 
-    {ok, EncodedGetEimConfigurationDataResponse} = 'SGP32Definitions':encode('GetEimConfigurationDataResponse', GetEimConfigurationDataResponse),
-    utils:binary_to_hex(EncodedGetEimConfigurationDataResponse).
+    Encoded = case Style of
+		 response ->
+		     % Formatted as GetEimConfigurationDataResponse
+		     {ok, Asn1Encoded} = 'SGP32Definitions':encode('GetEimConfigurationDataResponse', GetEimConfigurationDataResponse),
+		     Asn1Encoded;
+		 single ->
+		     % Formatted as EimConfigurationData only
+		     {ok, Asn1Encoded} = 'SGP32Definitions':encode('EimConfigurationData', EimConfigurationData),
+		     Asn1Encoded
+	     end,
+    utils:binary_to_hex(Encoded).

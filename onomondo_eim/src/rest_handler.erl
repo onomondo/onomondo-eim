@@ -131,7 +131,8 @@ get_rest_info(Req, State) ->
 		  {esipa_ip, list_to_binary(inet:ntoa(EsipaIp))},
 		  {esipa_port, EsipaPort},
 		  {esipa_ssl_cert, EsipaSslCertPem},
-		  {eim_configuration_data, eim_cfg:gen_eim_configuration_data()}
+		  {get_eim_configuration_data_response, eim_cfg:gen_eim_configuration_data(response)},
+		  {eim_configuration_data, eim_cfg:gen_eim_configuration_data(single)}
 		]},
     InfoListJson = utils:join_binary_list(jiffy:encode(InfoList)),
     Response = io_lib:format("{\"resource_id_list\": ~s}", [binary_to_list(InfoListJson)]),
