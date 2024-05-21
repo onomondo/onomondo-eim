@@ -218,7 +218,7 @@ DeleteProfileResult ::= INTEGER {
   profileNotInDisabledState(2),
   undefinedError(127)
 }
-SGP32-ProfileInfoListResponse ::= [45] CHOICE {
+SGP32-ProfileInfoListResponse ::= CHOICE {
   profileInfoListOk SEQUENCE OF ProfileInfo, -- see SGP.22
   profileInfoListError SGP32-ProfileInfoListError
 }
