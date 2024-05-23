@@ -15,7 +15,7 @@
 % debugging
 -export([dump_rest/0, dump_work/0]).
 
--record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome:: binary()}).
+-record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
 -record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), order, state}).
 
 %TODO: We need some mechanism that looks through the work table from time to time and checks the timestemp (field not
@@ -23,13 +23,13 @@
 %cleans up stale items.
 
 % helper function (to be called from a transaction) to set the status of an item in the rest table.
-trans_rest_set_status(ResourceId, Status, Outcome) ->
+trans_rest_set_status(ResourceId, Status, Outcome, Debuginfo) ->
     Q = qlc:q([X || X <- mnesia:table(rest), X#rest.resourceId == ResourceId]),
     Rows = qlc:e(Q),
     Timestamp = uuid:get_v1_time(),
     case Rows of
 	[Row | []] ->
-	    mnesia:write(Row#rest{status=Status, timestamp=Timestamp, outcome=Outcome}),
+	    mnesia:write(Row#rest{status=Status, timestamp=Timestamp, outcome=Outcome, debuginfo=Debuginfo}),
 	    ok;
 	[] ->
 	    error;
@@ -91,7 +91,7 @@ init() ->
     Trans = fun() ->
 		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work]),
 		    ResourceIds = qlc:e(Q),
-		    lists:foreach(fun(ResourceId) -> trans_rest_set_status(ResourceId, aborted, none) end, ResourceIds)
+		    lists:foreach(fun(ResourceId) -> trans_rest_set_status(ResourceId, aborted, none, none) end, ResourceIds)
 	    end,
     {atomic, ok} = mnesia:transaction(Trans),
     ok.
@@ -101,7 +101,7 @@ rest_create(Facility, EidValue, Order) ->
     ResourceId = uuid:uuid_to_string(uuid:get_v4_urandom()),
     Timestamp = uuid:get_v1_time(),
     Row = #rest{resourceId=ResourceId, facility=Facility, eidValue=EidValue, order=Order, status=new,
-		timestamp=Timestamp, outcome=none},
+		timestamp=Timestamp, outcome=[], debuginfo=none},
     Trans = fun() ->
 		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.resourceId == ResourceId]),
 		    Present = qlc:e(Q),
@@ -118,15 +118,15 @@ rest_create(Facility, EidValue, Order) ->
 % Lookup REST resource (order)
 rest_lookup(ResourceId, Facility) ->
     Trans = fun() ->
-		    Q = qlc:q([{X#rest.status, X#rest.timestamp, X#rest.eidValue, X#rest.order, X#rest.outcome} ||
+		    Q = qlc:q([{X#rest.status, X#rest.timestamp, X#rest.eidValue, X#rest.order, X#rest.outcome, X#rest.debuginfo} ||
 				  X <- mnesia:table(rest),
 				  X#rest.resourceId == ResourceId, X#rest.facility == Facility]),
 		    qlc:e(Q)
 	    end,
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
-	[{Status, Timestamp, EidValue, Order, Outcome}] ->
-	    {Status, Timestamp, EidValue, Order, Outcome};
+	[{Status, Timestamp, EidValue, Order, Outcome, Debuginfo}] ->
+	    {Status, Timestamp, EidValue, Order, Outcome, Debuginfo};
 	[] ->
 	    none;
 	_ ->
@@ -179,7 +179,7 @@ work_fetch(EidValue, Pid) ->
 			    case mnesia:write(WorkRow) of
 				ok ->
 				    % We are now working on this order
-				    ok = trans_rest_set_status(Row#rest.resourceId, work, none),
+				    ok = trans_rest_set_status(Row#rest.resourceId, work, [], none),
 				    Row;
 				_ ->
 				    error
@@ -191,9 +191,9 @@ work_fetch(EidValue, Pid) ->
 		    end
 	    end,
 
-    {atomic , Result} = mnesia:transaction(Trans),
+    {atomic, Result} = mnesia:transaction(Trans),
     case Result of
-	{rest, _, Facility, _, Order, _, _, _} ->
+	{rest, _, Facility, _, Order, _, _, _, _} ->
 	    logger:notice("Work: fetching new work item: EidValue=~p, Pid=~p, Order=~p, Facility=~p", [EidValue, Pid, Order, Facility]),
 	    {Facility, Order};
 	none ->
@@ -321,7 +321,7 @@ work_update(Pid, State) ->
 
 % Finish an order that has been worked on. This removes the related entry from the work table and sets the status in
 % the rest table to "done".
-work_finish(Pid, Status, Outcome) ->
+work_finish(Pid, Outcome, Debuginfo) ->
     Trans = fun() ->
 		    Q = qlc:q([X#work.resourceId || X <- mnesia:table(work), X#work.pid == Pid]),
 		    Rows = qlc:e(Q),
@@ -331,17 +331,17 @@ work_finish(Pid, Status, Outcome) ->
 			[ResourceId | _] ->
 			    Oid = {work, ResourceId},
 			    mnesia:delete(Oid),
-			    ok = trans_rest_set_status(ResourceId, Status, Outcome)
+			    ok = trans_rest_set_status(ResourceId, done, Outcome, Debuginfo)
 		    end
 	    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("Work: finishing work item: Pid=~p, Status=~p, Outcome=~p", [Pid, Status, Outcome]),
+	    logger:notice("Work: finishing work item: Pid=~p, Outcome=~p, Debuginfo=~p", [Pid, Outcome, Debuginfo]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot finish work item, database error: Pid=~p, Status=~p, Outcome=~p", [Pid, Status, Outcome]),
+	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p, Debuginfo=~p", [Pid, Outcome, Debuginfo]),
 	    error
 	end.
 

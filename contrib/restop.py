@@ -63,13 +63,13 @@ def main(argv):
         print(" resourceId: " + str(args.resource_id), file=sys.stderr)
         result = rest_lookup(args.host, args.facility, args.resource_id)
         print(json.dumps(result))
-        if 'outcome' in result:
-            outcome_hexstr=result['outcome']
-            outcome_bytes=h2b(outcome_hexstr)
-            outcome_term=erlang.binary_to_term(outcome_bytes)
+        if 'debuginfo' in result:
+            debuginfo_hexstr=result['debuginfo']
+            debuginfo_bytes=h2b(debuginfo_hexstr)
+            debuginfo_term=erlang.binary_to_term(debuginfo_bytes)
             pp = pprint.PrettyPrinter(depth=4)
-            outcome_pretty = pp.pformat(outcome_term)
-            print("decoded outcome: " + str(outcome_pretty), file=sys.stderr)
+            debuginfo_pretty = pp.pformat(debuginfo_term)
+            print("decoded debuginfo: " + str(debuginfo_pretty), file=sys.stderr)
     elif args.delete:
         print("delete on: " + str(args.host), file=sys.stderr)
         print(" facility: " + str(args.facility), file=sys.stderr)

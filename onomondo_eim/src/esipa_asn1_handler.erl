@@ -131,10 +131,12 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
     % perform ES9+ request
     {cancelSessionResponseEs9, Es9Resp} = es9p_client:request_json(Es9Req, BaseUrl),
 
+    Outcome = esipa_rest_utils:cancelSessionResponse_to_outcome(CancelSessionResp),
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
+
     % setup ESipa response message
     % CancelSessionResponseEsipa and CancelSessionResponseEs9 share the exact same definition, so we may convert
     % without an extra case statement.
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), canceled, EsipaReq),
     {cancelSessionResponseEsipa, Es9Resp};
 
 %GSMA SGP.32, section 6.3.2.4
@@ -144,6 +146,8 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
             % setup ES9+ request message
 	    Es9Req = case PendingNotif of
 			 {profileInstallationResult, PrfleInstRslt} ->
+			     Outcome = esipa_rest_utils:profileInstallationResult_to_outcome(PrfleInstRslt),
+			     ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
 			     % SGP32-ProfileInstallationResult and ProfileInstallationResult share the
 			     % exact same definition, so we may convert without an extra case statement.
 			     PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
@@ -151,6 +155,8 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 			     mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
 			     {handleNotification, #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}};
 			 {otherSignedNotification, OtherSignNotif} ->
+			     Outcome = esipa_rest_utils:otherSignedNotification_to_outcome(OtherSignNotif),
+			     ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
 			     % TODO: An otherSignedNotification does not contain a TransactionId. However it contains
 			     % an SMDP+ OID. Maybe we can at least use this OID to lookup the BaseUrl. In any case we
 			     % won't be able to lookup a specific WorkState here. (do we even need it in this case?)
@@ -167,14 +173,13 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 	    {} = es9p_client:request_json(Es9Req, BaseUrl);
 
 	{provideEimPackageResult, _PrvdeEimPkgRslt} ->
-        % TODO: This is a notification intended for the eIM itsself, we need to implement
-        % some handler function and call it from here.
-	    throw("TODO")
+	    %Use the already existing handle_asn1 function to prcess the provideEimPackageResult we got here
+	    %(provideEimPackageResult is directed to the eIM itsself, so there will be no ES9+ request)
+	    handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq})
     end,
 
     % There is no response defined for this function (see also SGP.32, section 6.3.2.4), so we send just an empty
     % response (0 bytes of data)
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, EsipaReq),
     emptyResponse;
 
 %GSMA SGP.32, section 6.3.2.6
@@ -196,8 +201,13 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			%{[{<<"activationCode">>, ActivationCode}]} = Order,
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
 		    {psmo, Order} ->
-			EuiccPackageSigned = esipa_euiccPackage:order_to_euiccPackageSigned(Order, EidValue),
-			{euiccPackageRequest, #{euiccPackageSigned => EuiccPackageSigned, eimSignature => <<0,0,0>>}};
+			EuiccPackageSigned = esipa_rest_utils:order_to_euiccPackageSigned(Order, EidValue),
+			case EuiccPackageSigned of
+			    error ->
+				{eimPackageError, undefinedError};
+			    _ ->
+				{euiccPackageRequest, #{euiccPackageSigned => EuiccPackageSigned, eimSignature => <<0,0,0>>}}
+			end;
 		    none ->
 			{eimPackageError, noEimPackageAvailable};
 		    _ ->
@@ -214,7 +224,14 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
     % TODO: Depending on the contents in provideEimPackageResult we will conditionally know the TransactionId. This
     % resumbably is the case for notifications belonging to some kind of transactions. Otherwise we may have an OID
     % of the SMDP+, which we may use to determine the BaseUrl.
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), success, EsipaReq),
+
+    {ePRAndNotifications, EPRAndNotifications} = EsipaReq,
+    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
+    {euiccPackageResultSigned, EuiccPackageResultSigned} = EuiccPackageResult,
+    EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
+
+    Outcome = esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned),
+    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
     {provideEimPackageResultResponse, undefined};
 
 %Unsupported request
