@@ -170,7 +170,7 @@ work_fetch(EidValue, Pid) ->
 
     Trans = fun() ->
 		    Q = qlc:q([X || X <- mnesia:table(rest),
-						 X#rest.eidValue == EidValue, X#rest.status == new]),
+				    X#rest.eidValue == EidValue, X#rest.status == new]),
 		    Rows = qlc:e(Q),
 		    case Rows of
 			[Row | _] ->
