@@ -208,7 +208,7 @@ order_to_euiccPackageSigned(Order, EidValue) ->
 % generate a JSON encodeable outcome (JSON REST API) from an EuiccPackageResultDataSigned
 euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned) ->
     EuiccResult = maps:get(euiccResult, EuiccPackageResultDataSigned),
-    Error = {[{<<"error">>, <<"result data conversion failed">>}]},
+    Error = {[{<<"error">>, <<"malformedResult">>}]},
     EuiccResultData2Json = fun(EuiccResultData) ->
 				   case EuiccResultData of
 				       {enableResult, EnableResult} ->
