@@ -201,7 +201,15 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			%{[{<<"activationCode">>, ActivationCode}]} = Order,
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
 		    {psmo, Order} ->
-			EuiccPackageSigned = esipa_rest_utils:order_to_euiccPackageSigned(Order, EidValue),
+			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue),
+			case EuiccPackageSigned of
+			    error ->
+				{eimPackageError, undefinedError};
+			    _ ->
+				{euiccPackageRequest, #{euiccPackageSigned => EuiccPackageSigned, eimSignature => <<0,0,0>>}}
+			end;
+		    {eco, Order} ->
+			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue),
 			case EuiccPackageSigned of
 			    error ->
 				{eimPackageError, undefinedError};

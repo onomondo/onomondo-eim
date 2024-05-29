@@ -2,7 +2,8 @@
 
 -module(esipa_rest_utils).
 
--export([order_to_euiccPackageSigned/2,
+-export([psmo_order_to_euiccPackageSigned/2,
+	 eco_order_to_euiccPackageSigned/2,
 	 euiccPackageResultDataSigned_to_outcome/1,
 	 profileInstallationResult_to_outcome/1,
 	 otherSignedNotification_to_outcome/1,
@@ -96,6 +97,58 @@ psmo_to_asn_configureAutoEnable(Psmo) ->
 	    error
     end.
 
+format_euicc_EuiccPackageSigned(EuiccPackage, EidValue) ->
+    case EuiccPackage of
+	error ->
+	    % The EuiccPackage was not generated properly
+	    error;
+	_ ->
+	    {ok, EimId} = application:get_env(onomondo_eim, eim_id),
+	    #{eimId => list_to_binary(EimId),
+	      eidValue => EidValue,
+	      counterValue => 0, % TODO: pick a suitable value (how?)
+	      transactionId => <<1,2,3,4>>, %TODO: generate a random transaction id (and store it?)
+	      euiccPackage => EuiccPackage}
+    end.
+
+% Generate an euiccPackageSigned from a PSMO Order (JSON REST API)
+psmo_order_to_euiccPackageSigned(Order, EidValue) ->
+   Order2Psmo = fun(PsmoOrder) ->
+			case PsmoOrder of
+			    {[{<<"enable">>, Psmo}]} ->
+				psmo_to_asn_enable(Psmo);
+			    {[{<<"disable">>, Psmo}]} ->
+				psmo_to_asn_disable(Psmo);
+			    {[{<<"delete">>, Psmo}]} ->
+				psmo_to_asn_delete(Psmo);
+			    {[{<<"listProfileInfo">>, Psmo}]} ->
+				psmo_to_asn_listProfileInfo(Psmo);
+			    {[{<<"getRAT">>, Psmo}]} ->
+				psmo_to_asn_getRAT(Psmo);
+			    {[{<<"configureAutoEnable">>, Psmo}]} ->
+				psmo_to_asn_configureAutoEnable(Psmo);
+			    _ ->
+				error
+			end
+		end,
+
+    % Convert Order to PSMO list
+    EuiccPackage = case Order of
+		       {[{<<"psmo">>, PsmoOrderList}]} ->
+			   PsmoList = [Order2Psmo(O) || O <- PsmoOrderList ],
+			   case lists:member(error, PsmoList) of
+			       true ->
+				   % At least one PSMO has failed the conversion from JSON to ASN.
+				   error;
+			       false ->
+				   {psmoList, PsmoList}
+			   end;
+		       _ ->
+			   error
+		   end,
+
+    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue).
+
 eco_to_asn_addEim(Eco) ->
     case Eco of
 	{[{<<"eimConfigurationData">>, EimCfgEnc}]} ->
@@ -130,27 +183,8 @@ eco_to_asn_listEim(Psmo) ->
 	    error
     end.
 
-% Generate an euiccPackageSigned from an Order (JSON REST API)
-order_to_euiccPackageSigned(Order, EidValue) ->
-   Order2Psmo = fun(PsmoOrder) ->
-			case PsmoOrder of
-			    {[{<<"enable">>, Psmo}]} ->
-				psmo_to_asn_enable(Psmo);
-			    {[{<<"disable">>, Psmo}]} ->
-				psmo_to_asn_disable(Psmo);
-			    {[{<<"delete">>, Psmo}]} ->
-				psmo_to_asn_delete(Psmo);
-			    {[{<<"listProfileInfo">>, Psmo}]} ->
-				psmo_to_asn_listProfileInfo(Psmo);
-			    {[{<<"getRAT">>, Psmo}]} ->
-				psmo_to_asn_getRAT(Psmo);
-			    {[{<<"configureAutoEnable">>, Psmo}]} ->
-				psmo_to_asn_configureAutoEnable(Psmo);
-			    _ ->
-				error
-			end
-		end,
-
+% Generate an euiccPackageSigned from a eCO Order (JSON REST API)
+eco_order_to_euiccPackageSigned(Order, EidValue) ->
     Order2Eco = fun(EcoOrder) ->
 			case EcoOrder of
 			    {[{<<"addEim">>, Eco }]} ->
@@ -168,16 +202,6 @@ order_to_euiccPackageSigned(Order, EidValue) ->
 
     % Convert Order to PSMO list
     EuiccPackage = case Order of
-		       % TODO: add support for eCO
-		       {[{<<"psmo">>, PsmoOrderList}]} ->
-			   PsmoList = [Order2Psmo(O) || O <- PsmoOrderList ],
-			   case lists:member(error, PsmoList) of
-			       true ->
-				   % At least one PSMO has failed the conversion from JSON to ASN.
-				   error;
-			       false ->
-				   {psmoList, PsmoList}
-			   end;
 		       {[{<<"eco">>, EcoOrderList}]} ->
 			   EcoList = [Order2Eco(O) || O <- EcoOrderList ],
 			   case lists:member(error, EcoList) of
@@ -191,19 +215,7 @@ order_to_euiccPackageSigned(Order, EidValue) ->
 			   error
 		   end,
 
-    % Format EuiccPackageSigned
-    case EuiccPackage of
-	error ->
-	    % The EuiccPackage was not generated properly
-	    error;
-	_ ->
-	    {ok, EimId} = application:get_env(onomondo_eim, eim_id),
-	    #{eimId => list_to_binary(EimId),
-	      eidValue => EidValue,
-	      counterValue => 0, % TODO: pick a suitable value (how?)
-	      transactionId => <<1,2,3,4>>, %TODO: generate a random transaction id (and store it?)
-	      euiccPackage => EuiccPackage}
-    end.
+    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue).
 
 memberOrNil(Key, Map) ->
     case maps:is_key(Key, Map) of
