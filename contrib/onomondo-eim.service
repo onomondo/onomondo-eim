@@ -1,0 +1,9 @@
+[Unit]
+Description=onomondo-eim
+
+[Service]
+Type=simple
+ExecStart=/path/to/my/onomondo_eim/_rel/onomondo_eim_release/bin/onomondo_eim_release foreground
+
+[Install]
+WantedBy=multi-user.target
