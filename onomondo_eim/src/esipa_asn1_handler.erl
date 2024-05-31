@@ -239,10 +239,21 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
 
     {ePRAndNotifications, EPRAndNotifications} = EsipaReq,
     EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
-    {euiccPackageResultSigned, EuiccPackageResultSigned} = EuiccPackageResult,
-    EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
 
-    Outcome = esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned),
+    Outcome = case EuiccPackageResult of
+		  {euiccPackageResultSigned, EuiccPackageResultSigned} ->
+		      EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
+		      esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned);
+		  {euiccPackageErrorSigned, _} ->
+		      %TODO: create an esipa_rest_utils:euiccPackageErrorSigned_to_outcome that extracts useful
+		      %error information to JSON
+		      [{[{euiccPackageErrorSigned, error}]}];
+		  {euiccPackageErrorUnsigned, _} ->
+		      %TODO: create an esipa_rest_utils:euiccPackageErrorUnsigned_to_outcome that extracts useful
+		      %error information to JSON
+		      [{[{euiccPackageErrorUnsigned, error}]}]
+    end,
+
     ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
     {provideEimPackageResultResponse, undefined};
 
