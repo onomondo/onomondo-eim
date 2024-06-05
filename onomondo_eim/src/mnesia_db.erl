@@ -12,11 +12,15 @@
 % work functions, to be called by the eIM code (from inside)
 -export([work_fetch/2, work_pickup/1, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
 
+% euicc functions, to be called by the eIM code (from inside)
+-export([euicc_counter_tick/1]).
+
 % debugging
--export([dump_rest/0, dump_work/0]).
+-export([dump_rest/0, dump_work/0, dump_euicc/0]).
 
 -record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
 -record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), order, state}).
+-record(euicc, {eidValue :: binary(), counterValue :: integer()}).
 
 %TODO: We need some mechanism that looks through the work table from time to time and checks the timestemp (field not
 %yet created in work) to find stuck work items. We also might also need a similar mechanism for the rest table that
@@ -76,6 +80,19 @@ init() ->
 	    logger:notice("    work table created")
     end,
 
+    % The euicc table will store the eUICC master data, such as the eID and the counterValue that is required for
+    % the replay protection.
+    case mnesia:create_table(euicc,
+			     [{attributes, record_info(fields, euicc)},
+			      {disc_copies, [node()]},
+			      {type, set}
+			     ]) of
+	{aborted, {already_exists, euicc}} ->
+	    ok;
+	{atomic, ok} ->
+	    logger:notice("    euicc table created")
+    end,
+
     % Wait until the mnesia tables become available.
     case mnesia:wait_for_tables([rest, work], 60000) of
 	{timeout, _} ->
@@ -98,6 +115,7 @@ init() ->
 
 % Create REST resource (order)
 rest_create(Facility, EidValue, Order) ->
+    ok = euicc_create_if_not_exist(EidValue),
     ResourceId = uuid:uuid_to_string(uuid:get_v4_urandom()),
     Timestamp = uuid:get_v1_time(),
     Row = #rest{resourceId=ResourceId, facility=Facility, eidValue=EidValue, order=Order, status=new,
@@ -345,6 +363,59 @@ work_finish(Pid, Outcome, Debuginfo) ->
 	    error
 	end.
 
+% Create a new eUICC master data entry
+euicc_create_if_not_exist(EidValue) ->
+    {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
+    Row = #euicc{eidValue=EidValue, counterValue=CounterValue},
+    Trans = fun() ->
+		    Q = qlc:q([X#euicc.eidValue || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+		    Present = qlc:e(Q),
+		    case Present of
+			[] ->
+			    mnesia:write(Row);
+			_ ->
+			    present
+		    end
+	    end,
+    {atomic, Result} = mnesia:transaction(Trans),
+    case Result of
+        ok ->
+	    logger:notice("eUICC: creating new master data entry: eID=~p, counter=~p", [EidValue, CounterValue]),
+	    ok;
+	present ->
+	    ok;
+	_ ->
+	    logger:error("eUICC: cannot create master data entry, database error: eID=~p", [EidValue]),
+	    error
+	end.
+
+% get an incremented counterValue (and store the incremented counterValue as the current counterValue)
+euicc_counter_tick(EidValue) ->
+    Trans = fun() ->
+		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+		    Rows = qlc:e(Q),
+		    case Rows of
+			[Row | _] ->
+			    CounterValue = Row#euicc.counterValue + 1,
+			    mnesia:write(Row#euicc{counterValue=CounterValue}),
+			    {ok, CounterValue};
+			[] ->
+			    error;
+			_ ->
+			    error
+		    end
+	    end,
+
+    {atomic , Result} = mnesia:transaction(Trans),
+    case Result of
+        {ok, CounterValue} ->
+	    logger:notice("eUICC: incrementing counterValue: eID=~p, counter=~p", [EidValue, CounterValue]),
+	    {ok, CounterValue};
+	_ ->
+	    logger:error("eUICC: cannot increment counterValue, database error: eID=~p", [EidValue]),
+	    error
+    end.
+
 % Dump all currently pending rest items (for debugging, to be called from console)
 dump_rest() ->
     Trans = fun() ->
@@ -359,6 +430,15 @@ dump_rest() ->
 dump_work() ->
     Trans = fun() ->
 		    Q = qlc:q([X || X <- mnesia:table(work)]),
+		    qlc:e(Q)
+	    end,
+    {atomic, Result} = mnesia:transaction(Trans),
+    Result.
+
+% Dump all eUICCs we are aware of
+dump_euicc() ->
+    Trans = fun() ->
+		    Q = qlc:q([X || X <- mnesia:table(euicc)]),
 		    qlc:e(Q)
 	    end,
     {atomic, Result} = mnesia:transaction(Trans),

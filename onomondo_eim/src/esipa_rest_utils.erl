@@ -104,9 +104,10 @@ format_euicc_EuiccPackageSigned(EuiccPackage, EidValue) ->
 	    error;
 	_ ->
 	    {ok, EimId} = application:get_env(onomondo_eim, eim_id),
+	    {ok, CounterValue} = mnesia_db:euicc_counter_tick(utils:binary_to_hex(EidValue)),
 	    #{eimId => list_to_binary(EimId),
 	      eidValue => EidValue,
-	      counterValue => 0, % TODO: pick a suitable value (how?)
+	      counterValue => CounterValue,
 	      transactionId => <<1,2,3,4>>, %TODO: generate a random transaction id (and store it?)
 	      euiccPackage => EuiccPackage}
     end.
