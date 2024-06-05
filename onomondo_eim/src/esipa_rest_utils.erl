@@ -2,8 +2,8 @@
 
 -module(esipa_rest_utils).
 
--export([psmo_order_to_euiccPackageSigned/2,
-	 eco_order_to_euiccPackageSigned/2,
+-export([psmo_order_to_euiccPackageSigned/3,
+	 eco_order_to_euiccPackageSigned/3,
 	 euiccPackageResultDataSigned_to_outcome/1,
 	 profileInstallationResult_to_outcome/1,
 	 otherSignedNotification_to_outcome/1,
@@ -97,7 +97,7 @@ psmo_to_asn_configureAutoEnable(Psmo) ->
 	    error
     end.
 
-format_euicc_EuiccPackageSigned(EuiccPackage, EidValue) ->
+format_euicc_EuiccPackageSigned(EuiccPackage, EidValue, TransactionId) ->
     case EuiccPackage of
 	error ->
 	    % The EuiccPackage was not generated properly
@@ -108,12 +108,12 @@ format_euicc_EuiccPackageSigned(EuiccPackage, EidValue) ->
 	    #{eimId => list_to_binary(EimId),
 	      eidValue => EidValue,
 	      counterValue => CounterValue,
-	      transactionId => <<1,2,3,4>>, %TODO: generate a random transaction id (and store it?)
+	      transactionId => TransactionId,
 	      euiccPackage => EuiccPackage}
     end.
 
 % Generate an euiccPackageSigned from a PSMO Order (JSON REST API)
-psmo_order_to_euiccPackageSigned(Order, EidValue) ->
+psmo_order_to_euiccPackageSigned(Order, EidValue, TransactionId) ->
    Order2Psmo = fun(PsmoOrder) ->
 			case PsmoOrder of
 			    {[{<<"enable">>, Psmo}]} ->
@@ -148,7 +148,7 @@ psmo_order_to_euiccPackageSigned(Order, EidValue) ->
 			   error
 		   end,
 
-    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue).
+    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue, TransactionId).
 
 eco_to_asn_addEim(Eco) ->
     case Eco of
@@ -185,7 +185,7 @@ eco_to_asn_listEim(Psmo) ->
     end.
 
 % Generate an euiccPackageSigned from a eCO Order (JSON REST API)
-eco_order_to_euiccPackageSigned(Order, EidValue) ->
+eco_order_to_euiccPackageSigned(Order, EidValue, TransactionId) ->
     Order2Eco = fun(EcoOrder) ->
 			case EcoOrder of
 			    {[{<<"addEim">>, Eco }]} ->
@@ -216,7 +216,7 @@ eco_order_to_euiccPackageSigned(Order, EidValue) ->
 			   error
 		   end,
 
-    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue).
+    format_euicc_EuiccPackageSigned(EuiccPackage, EidValue, TransactionId).
 
 memberOrNil(Key, Map) ->
     case maps:is_key(Key, Map) of

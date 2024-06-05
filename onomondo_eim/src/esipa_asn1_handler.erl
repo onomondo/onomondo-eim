@@ -200,7 +200,9 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			{[{<<"download">>, {[{<<"activationCode">>, ActivationCode}]}}]} = Order,
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
 		    {psmo, Order} ->
-			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue),
+			TransactionIdPsmo = rand:bytes(16),
+			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdPsmo),
+			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue, TransactionIdPsmo),
 			case EuiccPackageSigned of
 			    error ->
 				{eimPackageError, undefinedError};
@@ -210,7 +212,9 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 				   eimSignature => crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned)}}
 			end;
 		    {eco, Order} ->
-			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue),
+			TransactionIdEco = rand:bytes(16),
+			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdEco),
+			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue, TransactionIdEco),
 			case EuiccPackageSigned of
 			    error ->
 				{eimPackageError, undefinedError};
@@ -239,11 +243,23 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
     {ePRAndNotifications, EPRAndNotifications} = EsipaReq,
     EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
 
+    WorkBind = fun(Map) ->
+		      case maps:is_key(transactionId, Map) of
+			  true ->
+			      mnesia_db:work_bind(maps:get(pid, Req0), maps:get(transactionId, Map));
+			  _ ->
+			      ok
+		      end
+	       end,
+
     Outcome = case EuiccPackageResult of
 		  {euiccPackageResultSigned, EuiccPackageResultSigned} ->
 		      EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
+		      WorkBind(EuiccPackageResultDataSigned),
 		      esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned);
-		  {euiccPackageErrorSigned, _} ->
+		  {euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
+		      EuiccPackageErrorDataSigned = maps:get(euiccPackageErrorDataSigned, EuiccPackageErrorSigned),
+		      WorkBind(EuiccPackageErrorDataSigned),
 		      %TODO: create an esipa_rest_utils:euiccPackageErrorSigned_to_outcome that extracts useful
 		      %error information to JSON
 		      [{[{euiccPackageErrorSigned, error}]}];
