@@ -450,7 +450,6 @@ dump_rest() ->
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
 
-
 % Dump all currently pending work items (for debugging, to be called from console)
 dump_work() ->
     Trans = fun() ->
