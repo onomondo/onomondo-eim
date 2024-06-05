@@ -198,7 +198,6 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
     EsipaResp = case Work of
 		    {download, Order} ->
 			{[{<<"download">>, {[{<<"activationCode">>, ActivationCode}]}}]} = Order,
-			%{[{<<"activationCode">>, ActivationCode}]} = Order,
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
 		    {psmo, Order} ->
 			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue),
