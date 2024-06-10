@@ -80,7 +80,7 @@ def main(argv):
         print("list on: " + str(args.host), file=sys.stderr)
         print(" facility: " + str(args.facility), file=sys.stderr)
         print("result:", file=sys.stderr)
-        print(json.dumps(rest_list(args.host, args.facility), file=sys.stderr))
+        print(json.dumps(rest_list(args.host, args.facility)), file=sys.stderr)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
