@@ -293,6 +293,24 @@ result_to_json_addEimResult(AddEimResult) ->
 	    {[{addEimResult, {[{addEimResultCode, malformedResult}]}}]}
     end.
 
+result_to_json_getRATResult(GetRATResult) ->
+    Op2Json = fun(Op) ->
+		      List = [{mccMnc, utils:binary_to_hex(maps:get(mccMnc,Op))},
+			       memberOrNilHex(gid1, Op),
+			       memberOrNilHex(gid2, Op)
+			     ],
+		      {lists:filter(fun(Member) -> Member /= nil end, List)}
+	      end,
+    Ppr2Json = fun(Ppr) ->
+		       {[{pprUpdateControl, lists:member(pprUpdateControl, maps:get(pprIds, Ppr))},
+			  {ppr1, lists:member(ppr1, maps:get(pprIds, Ppr))},
+			  {ppr2, lists:member(ppr2, maps:get(pprIds, Ppr))},
+			  {allowedOperators, [Op2Json(O) || O <- maps:get(allowedOperators, Ppr)]},
+			  {consentRequired, lists:member(consentRequired, maps:get(pprFlags, Ppr))}]}
+			end,
+    RulesAuthorisationTable = [Ppr2Json(O) || O <- GetRATResult],
+    {[{getRATResult, RulesAuthorisationTable}]}.
+
 % generate a JSON encodeable outcome (JSON REST API) from an EuiccPackageResultDataSigned
 euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned) ->
     EuiccResult = maps:get(euiccResult, EuiccPackageResultDataSigned),
@@ -307,10 +325,8 @@ euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned) ->
 					   {[{deleteResult, DeleteResult}]};
 				       {listProfileInfoResult, ListProfileInfoResult} ->
 					   result_to_json_listProfileInfoResult(ListProfileInfoResult);
-				       {getRATResult, _} ->
-					   % TODO: extract useful information from getRATResult
-					   % and format it as JSON encodeable outcome
-					   {[{getRATResult, absent}]};
+				       {getRATResult, GetRATResult} ->
+					   result_to_json_getRATResult(GetRATResult);
 				       {configureAutoEnableResult, ConfigureAutoEnableResult} ->
 					   {[{configureAutoEnableResult, ConfigureAutoEnableResult}]};
 				       {addEimResult, AddEimResult} ->
