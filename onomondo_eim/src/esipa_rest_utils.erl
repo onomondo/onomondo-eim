@@ -16,6 +16,7 @@ psmo_to_asn_enable(Psmo) ->
 	{[{<<"iccid">>, Iccid}, {<<"rollback">>, false}]} ->
 	    {enable, #{iccid => utils:hex_to_binary(Iccid)}};
 	_ ->
+	    logger:error("REST: order with bad enable PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -24,6 +25,7 @@ psmo_to_asn_disable(Psmo) ->
 	{[{<<"iccid">>,Iccid}]} ->
 	    {disable, #{iccid => utils:hex_to_binary(Iccid)}};
 	_ ->
+	    logger:error("REST: order with bad disable PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -32,6 +34,7 @@ psmo_to_asn_delete(Psmo) ->
 	{[{<<"iccid">>,Iccid}]} ->
 	    {delete, #{iccid => utils:hex_to_binary(Iccid)}};
 	_ ->
+	    logger:error("REST: order with bad delete PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -46,6 +49,7 @@ psmo_to_asn_listProfileInfo(Psmo) ->
 		{[{<<"profileClass">>, ProfileClass}]} ->
 		    {listProfileInfo, #{searchCriteria => {profileClass, utils:hex_to_integer(ProfileClass)}, tagList => utils:hex_to_binary(TagList) }};
 		_ ->
+		    logger:error("REST: order with bad listProfilesInfo PSMO: ~p", [Psmo]),
 		    error
 	    end;
 	{[{<<"searchCriteria">>, SearchCriteria}]} ->
@@ -57,6 +61,7 @@ psmo_to_asn_listProfileInfo(Psmo) ->
 		{[{<<"profileClass">>, ProfileClass}]} ->
 		    {listProfileInfo, #{searchCriteria => {profileClass, utils:hex_to_integer(ProfileClass)} }};
 		_ ->
+		    logger:error("REST: order with bad listProfilesInfo PSMO: ~p", [Psmo]),
 		    error
 	    end;
 	{[{<<"tagList">>, TagList}]} ->
@@ -64,6 +69,7 @@ psmo_to_asn_listProfileInfo(Psmo) ->
 	{[]} ->
 	    {listProfileInfo, #{}};
 	_ ->
+	    logger:error("REST: order with bad listProfilesInfo PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -72,6 +78,7 @@ psmo_to_asn_getRAT(Psmo) ->
 	{[]} ->
 	    {getRAT, #{}};
 	_ ->
+	    logger:error("REST: order with bad getRAT PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -94,6 +101,7 @@ psmo_to_asn_configureAutoEnable(Psmo) ->
 	{[{<<"autoEnableFlag">>, false}]} ->
 	    {configureAutoEnable, #{}};
 	_ ->
+	    logger:error("REST: order with bad configureAutoEnable PSMO: ~p", [Psmo]),
 	    error
     end.
 
@@ -129,6 +137,7 @@ psmo_order_to_euiccPackageSigned(Order, EidValue, TransactionId) ->
 			    {[{<<"configureAutoEnable">>, Psmo}]} ->
 				psmo_to_asn_configureAutoEnable(Psmo);
 			    _ ->
+				logger:error("REST: order with unknown/unsupported PSMO: ~p", [PsmoOrder]),
 				error
 			end
 		end,
@@ -156,6 +165,7 @@ eco_to_asn_addEim(Eco) ->
 	    {ok, EimCfg} = 'SGP32Definitions':decode('EimConfigurationData', utils:hex_to_binary(EimCfgEnc)),
 	    {addEim, EimCfg};
 	_ ->
+	    logger:error("REST: order with bad addEim eCO: ~p", [Eco]),
 	    error
     end.
 
@@ -164,6 +174,7 @@ eco_to_asn_deleteEim(Eco) ->
 	{[{<<"eimId">>, EimId}]} ->
 	    {deleteEim, #{eimId => EimId}};
 	_ ->
+	    logger:error("REST: order with bad deleteEim eCO: ~p", [Eco]),
 	    error
     end.
 
@@ -173,14 +184,16 @@ eco_to_asn_updateEim(Eco) ->
 	    {ok, EimCfg} = 'SGP32Definitions':decode('EimConfigurationData', utils:hex_to_binary(EimCfgEnc)),
 	    {updateEim, EimCfg};
 	_ ->
+	    logger:error("REST: order with bad updateEim eCO: ~p", [Eco]),
 	    error
     end.
 
-eco_to_asn_listEim(Psmo) ->
-    case Psmo of
+eco_to_asn_listEim(Eco) ->
+    case Eco of
 	{[]} ->
 	    {listEim, #{}};
 	_ ->
+	    logger:error("REST: order with bad listEim eCO: ~p", [Eco]),
 	    error
     end.
 
@@ -197,6 +210,7 @@ eco_order_to_euiccPackageSigned(Order, EidValue, TransactionId) ->
 			    {[{<<"listEim">>, Eco }]} ->
 				eco_to_asn_listEim(Eco);
 			    _ ->
+				logger:error("REST: order with unknown/unsupported eCO: ~p", [EcoOrder]),
 				error
 			end
 		end,
