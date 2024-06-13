@@ -233,67 +233,22 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.7
 handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
-    % TODO: Evaluate the contents of the EimPackageResult. This result may contain either results intended for the eIM
-    % only, but it also may contain results/notifications intended to be forwarded to the SMDP+. We may forward those
-    % results/notification to the SMDP+ in a similar way like we already do it in handleNotificationEsipa.
-    % TODO: Depending on the contents in provideEimPackageResult we will conditionally know the TransactionId. This
-    % presumbably is the case for notifications belonging to some kind of transactions. Otherwise we may have an OID
-    % of the SMDP+, which we may use to determine the BaseUrl.
-
-    {ePRAndNotifications, EPRAndNotifications} = EsipaReq,
-    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
-
-    WorkBind = fun(Map) ->
-		      case maps:is_key(transactionId, Map) of
-			  true ->
-			      mnesia_db:work_bind(maps:get(pid, Req0), maps:get(transactionId, Map));
-			  _ ->
-			      ok
-		      end
-	       end,
-
-    CheckCounterValue = fun(Map) ->
-				{EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0)),
-				CounterValueIpad = maps:get(counterValue, Map),
-				{ok, CounterValueEim} = mnesia_db:euicc_counter_get(EidValue),
-				case CounterValueIpad of
-				    CounterValueEim ->
-					ok;
-				    _ ->
-					logger:error("invalid euiccPackageResultSigned, counterValue mismatch: CounterValueIpad=~p, CounterValueEim=~p",
-						     [CounterValueIpad, CounterValueEim]),
-					error
-				end
-			end,
-
-    Outcome = case EuiccPackageResult of
-		  {euiccPackageResultSigned, EuiccPackageResultSigned} ->
-		      EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
-		      WorkBind(EuiccPackageResultDataSigned),
-		      case CheckCounterValue(EuiccPackageResultDataSigned) of
-			  ok ->
-			      esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(EuiccPackageResultDataSigned);
-			  _ ->
-			      [{[{euiccPackageResultSigned, error}]}]
-			  end;
-		  {euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
-		      EuiccPackageErrorDataSigned = maps:get(euiccPackageErrorDataSigned, EuiccPackageErrorSigned),
-		      WorkBind(EuiccPackageErrorDataSigned),
-		      case CheckCounterValue(EuiccPackageErrorDataSigned) of
-			  ok ->
-			      %TODO: create an esipa_rest_utils:euiccPackageErrorSigned_to_outcome that extracts useful
-			      %error information to JSON
-			      [{[{euiccPackageErrorSigned, error}]}];
-			  _ ->
-			      [{[{euiccPackageResultSigned, error}]}]
-			  end;
-		  {euiccPackageErrorUnsigned, _} ->
-		      %TODO: create an esipa_rest_utils:euiccPackageErrorUnsigned_to_outcome that extracts useful
-		      %error information to JSON
-		      [{[{euiccPackageErrorUnsigned, error}]}]
+    % TODO: some of the contents of provideEimPackageResult contain ECDSA signatures. Verify those signatures.
+    case EsipaReq of
+	{euiccPackageResult, EuiccPackageResult} ->
+	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+	{ePRAndNotifications, EPRAndNotifications} ->
+	    % TODO: Do something useful with the notificationList, that is also included in this response
+	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
+	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+	{ipaEuiccDataResponse, _} ->
+	    throw("TODO: Implement handling of incoming EuiccDataResponse");
+	{profileDownloadTriggerResult, _} ->
+	    throw("TODO: Implement handling of incoming profileDownloadTriggerResult");
+	{eimPackageError, EimPackageError} ->
+	    Outcome = [{[{eimPackageError, EimPackageError}]}],
+	    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq)
     end,
-
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
     {provideEimPackageResultResponse, undefined};
 
 %Unsupported request
