@@ -18,6 +18,10 @@
 % debugging
 -export([dump_rest/0, dump_work/0, dump_euicc/0]).
 
+% trigger database cleanup
+% TODO: call this automatially in regular intervals
+-export([cleanup/0]).
+
 -record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
 -record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), eidValue :: binary(), order, state}).
 -record(euicc, {eidValue :: binary(), counterValue :: integer()}).
@@ -454,6 +458,115 @@ euicc_counter_get(EidValue) ->
 	    {ok, CounterValue};
 	_ ->
 	    logger:error("eUICC: cannot read current counterValue, database error: eID=~p", [EidValue]),
+	    error
+    end.
+
+mark_stuck(Timeout) ->
+    % There may be corner cases where the order gets stuck because the other entity suddenly stops responding. In
+    % this case the order will stall. When it remains stalled for too long (minutes), we should remove all related
+    % items from the work table and put an appropriate outcome (error code) into the rest table.
+
+    TimestampNow = os:system_time(seconds),
+
+    % Remove Resource from work table and set an appropriate status in the rest table
+    HandleResource = fun(ResourceId) ->
+			     io:format("=>~p~n", [ResourceId]),
+			     Oid = {work, ResourceId},
+			     mnesia:delete(Oid),
+			     trans_rest_set_status(ResourceId, done, [{[{procedureError, stuck}]}], none)
+		     end,
+
+    % Find all rest resources that stall in status "work" and older than the specified timeout value
+    Trans = fun() ->
+		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work, TimestampNow - X#rest.timestamp > Timeout]),
+		    Rows = qlc:e(Q),
+		    case Rows of
+			[] ->
+			    ok;
+			Rows ->
+			    [HandleResource(Row) || Row <- Rows],
+			    ok
+		    end
+	    end,
+
+    {atomic, Result} = mnesia:transaction(Trans),
+    Result.
+
+mark_noshow(Timeout) ->
+    % There may be corner cases where the order is never processed because the related IPAd/eUICC never shows up to
+    % fetch the related eUICC package. If we see an order staying in status "new" for too long (days, weeks), we should
+    % mark it as "done" and put an appropriate outcome (error code) into the rest table.
+
+    TimestampNow = os:system_time(seconds),
+
+    % Remove Resource from work table and set an appropriate status in the rest table
+    HandleResource = fun(ResourceId) ->
+			     io:format("=>~p~n", [ResourceId]),
+			     trans_rest_set_status(ResourceId, done, [{[{procedureError, noshow}]}], none)
+		     end,
+
+    % Find all rest resources that stall in status "work" and older than the specified timeout value
+    Trans = fun() ->
+		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == new, TimestampNow - X#rest.timestamp > Timeout]),
+		    Rows = qlc:e(Q),
+		    case Rows of
+			[] ->
+			    ok;
+			Rows ->
+			    [HandleResource(Row) || Row <- Rows],
+			    ok
+		    end
+	    end,
+
+    {atomic, Result} = mnesia:transaction(Trans),
+    Result.
+
+delete_expired(Timeout) ->
+    % There may be cases where orders stay unmaintained for too long. When an order stays in status "done" for too long
+    % (hours, days), than this may mean that the REST API user lost interest. In this case the related items shoud be
+    % removed from the rest table after a reasonable timeout.
+
+    TimestampNow = os:system_time(seconds),
+
+    % Remove Resource from the rest table. Since an abandonned order won't have a coresponding work item in the work
+    % table we do not have to worry about creating an orphaned work item.
+    HandleResource = fun(ResourceId) ->
+			     io:format("=>~p~n", [ResourceId]),
+			     Oid = {rest, ResourceId},
+			     mnesia:delete(Oid)
+		     end,
+
+    % Find all rest resources that linger in the rest table for a long time and are not in the status "new"
+    Trans = fun() ->
+		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == done, TimestampNow - X#rest.timestamp > Timeout]),
+		    Rows = qlc:e(Q),
+		    case Rows of
+			[] ->
+			    ok;
+			Rows ->
+			    [HandleResource(Row) || Row <- Rows],
+			    ok
+		    end
+	    end,
+
+    {atomic, Result} = mnesia:transaction(Trans),
+    Result.
+
+% Run a cleanup cycle the database
+cleanup() ->
+    {ok, RestTimeoutStuck} = application:get_env(onomondo_eim, rest_timeout_stuck),
+    {ok, RestTimeoutNoshow} = application:get_env(onomondo_eim, rest_timeout_noshow),
+    {ok, RestTimeoutExpired} = application:get_env(onomondo_eim, rest_timeout_expired),
+    RcStalled = mark_stuck(RestTimeoutStuck),
+    RcNoshow = mark_noshow(RestTimeoutNoshow),
+    RcExpired = delete_expired(RestTimeoutExpired),
+
+    case {RcStalled, RcNoshow, RcExpired} of
+        {ok,ok,ok} ->
+	    logger:notice("Cleanup: running dabase cleanup cycle"),
+	    ok;
+	_ ->
+	    logger:error("Cleanup: database error"),
 	    error
     end.
 
