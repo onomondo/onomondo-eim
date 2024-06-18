@@ -18,8 +18,7 @@
 % debugging
 -export([dump_rest/0, dump_work/0, dump_euicc/0]).
 
-% trigger database cleanup
-% TODO: call this automatially in regular intervals
+% trigger recurring database cleanup (called automatically by timer from this module)
 -export([cleanup/0]).
 
 -record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
@@ -117,6 +116,10 @@ init() ->
 		    lists:foreach(fun(ResourceId) -> trans_rest_set_status(ResourceId, done, [{[{procedureError, aborted}]}], none) end, ResourceIds)
 	    end,
     {atomic, ok} = mnesia:transaction(Trans),
+
+    % Start recurring database cleanup cycles
+    ok = cleanup(),
+
     ok.
 
 % Create REST resource (order)
@@ -563,12 +566,15 @@ cleanup() ->
 
     case {RcStalled, RcNoshow, RcExpired} of
         {ok,ok,ok} ->
-	    logger:notice("Cleanup: running dabase cleanup cycle"),
 	    ok;
 	_ ->
 	    logger:error("Cleanup: database error"),
 	    error
-    end.
+    end,
+
+    % Next cleanup in 10 secs.
+    {ok, _} = timer:apply_after(10000, mnesia_db, cleanup, []),
+    ok.
 
 % Dump all currently pending rest items (for debugging, to be called from console)
 dump_rest() ->
