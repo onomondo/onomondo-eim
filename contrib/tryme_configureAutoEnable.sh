@@ -1,7 +1,7 @@
 #!/bin/bash
 . ./tryme.cfg
 
-JSON='{ "eidValue" : "'$EID'", "order" : { "psmo": [ { "configureAutoEnable" : { "autoEnableFlag" : false, "smdpAddress" : "smdpp.test.rsp.sysmocom.de" } } ] } }'
+JSON='{ "eidValue" : "'$EID'", "order" : { "psmo": [ { "configureAutoEnable" : { "autoEnableFlag" : true, "smdpAddress" : "rsp.truphone.com" } } ] } }'
 RC=`./restop.py -c -f psmo -j "$JSON"`
 echo $RC
 
