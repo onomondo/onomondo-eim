@@ -147,6 +147,9 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.4
 handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
+    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+    BaseUrl = maps:get(smdpAddress, WorkState),
+
     case EsipaReq of
 	{pendingNotification, PendingNotif} ->
             % setup ES9+ request message
@@ -174,8 +177,6 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 		     end,
 
             % perform ES9+ request (We expect an empty response in this case)
-	    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
-	    BaseUrl = maps:get(smdpAddress, WorkState),
 	    case es9p_client:request_json(Es9Req, BaseUrl) of
 		{} ->
 		    ok;
