@@ -372,8 +372,8 @@ work_finish(Pid, Outcome, Debuginfo) ->
 			[] ->
 			    error;
 			[ResourceId | _] ->
-			    Oid = {work, ResourceId},
-			    mnesia:delete(Oid),
+			    Oid = {work, Pid},
+			    ok = mnesia:delete(Oid),
 			    ok = trans_rest_set_status(ResourceId, done, Outcome, Debuginfo)
 		    end
 	    end,
