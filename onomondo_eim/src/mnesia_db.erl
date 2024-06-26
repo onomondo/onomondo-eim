@@ -474,7 +474,6 @@ mark_stuck(Timeout) ->
 
     % Remove Resource from work table and set an appropriate status in the rest table
     HandleResource = fun(ResourceId) ->
-			     io:format("=>~p~n", [ResourceId]),
 			     Oid = {work, ResourceId},
 			     ok = mnesia:delete(Oid),
 			     trans_rest_set_status(ResourceId, done, [{[{procedureError, stuckOrder}]}], none)
@@ -505,7 +504,6 @@ mark_noshow(Timeout) ->
 
     % Remove Resource from work table and set an appropriate status in the rest table
     HandleResource = fun(ResourceId) ->
-			     io:format("=>~p~n", [ResourceId]),
 			     trans_rest_set_status(ResourceId, done, [{[{procedureError, noshowOrder}]}], none)
 		     end,
 
@@ -535,7 +533,6 @@ delete_expired(Timeout) ->
     % Remove Resource from the rest table. Since an abandonned order won't have a coresponding work item in the work
     % table we do not have to worry about creating an orphaned work item.
     HandleResource = fun(ResourceId) ->
-			     io:format("=>~p~n", [ResourceId]),
 			     Oid = {rest, ResourceId},
 			     ok = mnesia:delete(Oid)
 		     end,
