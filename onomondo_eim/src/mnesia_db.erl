@@ -585,6 +585,8 @@ euicc_setparam() ->
     % An eUICC procedure in the context of this module has nothing to do with any of the procedures specified in
     % GSMA SGP.22 or SGP.32. In this module an eUICC procedure is a virtual procedure were parameters in the
     % euicc table are set.
+
+    %update one specific parameter
     UpdateEuiccParam = fun(EidValue, Name, Value) ->
 			       Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
 			       Rows = qlc:e(Q),
@@ -604,7 +606,6 @@ euicc_setparam() ->
 				       error
 			       end
 		       end,
-
     HandleParam = fun(ResourceId, EidValue, Param) ->
 			  case Param of
 			      {[{Name, Value}]} ->
@@ -619,7 +620,7 @@ euicc_setparam() ->
 			  end
 		  end,
 
-    % Remove Resource from work table and set an appropriate status in the rest table
+    % Parse order and process each parameter individually
     HandleResource = fun({ResourceId, EidValue, Order}) ->
 			     trans_euicc_create_if_not_exist(EidValue),
 			     case Order of
@@ -631,7 +632,7 @@ euicc_setparam() ->
 			     end
 		     end,
 
-    % Find all rest resources that stall in status "work" and older than the specified timeout value
+    % Look into facility euicc and find the first entry that is in status "new".
     Trans = fun() ->
 		    Q = qlc:q([{X#rest.resourceId, X#rest.eidValue, X#rest.order} || X <- mnesia:table(rest), X#rest.status == new, X#rest.facility == euicc]),
 		    Rows = qlc:e(Q),
