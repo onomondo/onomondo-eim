@@ -1,18 +1,20 @@
 % Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
 
+%TODO: This code still lacks the verification of signatures, the reason for this is that it was still not possible to
+%verify a signature in practice.
+
 -module(crypto_utils).
 
--export([sign_euiccPackageSigned/1, verify_euiccPackageResultSigned/1]).
+-export([sign_euiccPackageSigned/2, verify_euiccPackageResultSigned/3]).
 
-%for debugging
--export([der_to_plain/1, plain_to_der/1]).
-
+%temporary, for debugging
+-export([der_to_plain/1, plain_to_der/1, verify_experiment1/0, verify_experiment2/0]).
 
 %Convert from DER encoded signature format to plain format (see also BSI TR03111 5.2.1)
 der_to_plain(DERSignature) ->
     {ok, [R, S]} = 'DERSignature':decode('DERSignature', DERSignature),
-    RPlain = utils:hex_to_binary(list_to_binary(integer_to_list(R, 16))),
-    SPlain = utils:hex_to_binary(list_to_binary(integer_to_list(S, 16))),
+    RPlain = utils:lpad_binary(utils:integer_to_bytes(R), <<0>>, 32),
+    SPlain = utils:lpad_binary(utils:integer_to_bytes(S), <<0>>, 32),
     utils:join_binary_list([RPlain, SPlain]).
 
 %Convert from plain format to DER encoded signature format (see also BSI TR03111 5.2.1)
@@ -23,15 +25,16 @@ plain_to_der(PlainSignature) ->
     {ok, DERSignatureEncoded} = 'DERSignature':encode('DERSignature', DERSignature),
     DERSignatureEncoded.
 
-sign_euiccPackageSigned(EuiccPackageSigned) ->
-    %TODO: read the associationToken from somewhere, we likely have to store
-    %an associationToken for each eUICC in the (to be developed) eUICC database.
-    %for now we will use a hardcoded associationToken for test:
-    AssociationToken = <<132,1,1>>,
+sign_euiccPackageSigned(EuiccPackageSigned, EidValue) ->
+    % Read the AssociationToken
+    {ok, AssociationToken} = mnesia_db:euicc_param_get(utils:binary_to_hex(EidValue), associationToken),
+    AssociationTokenBinary = utils:integer_to_bytes(AssociationToken),
+    AssociationTokenLength = utils:integer_to_bytes(byte_size(AssociationTokenBinary)),
+    AssociationTokenBer =  utils:join_binary_list([<<132>>, AssociationTokenLength, AssociationTokenBinary]),
 
     %Format message to be signed
     {ok, EuiccPackageSignedEnc} = 'SGP32Definitions':encode('EuiccPackageSigned', EuiccPackageSigned),
-    MsgToBeSigned = utils:join_binary_list([EuiccPackageSignedEnc, AssociationToken]),
+    MsgToBeSigned = utils:join_binary_list([EuiccPackageSignedEnc, AssociationTokenBer]),
 
     %Load private key from eIM certificate
     {ok, EimKeyPath} = application:get_env(onomondo_eim, eim_key),
@@ -44,60 +47,125 @@ sign_euiccPackageSigned(EuiccPackageSigned) ->
     % https://www.erlang.org/doc/apps/public_key/public_key#sign/4
     der_to_plain(public_key:sign(MsgToBeSigned, sha256, EimKeyECPrivateKey)).
 
-verify_signature(Message, Signature) ->
+verify_signature(Message, Signature, EidValue) ->
     DERSignature = plain_to_der(Signature),
-    io:format("===============================================================~n"),
-    io:format("============Signature>~p~n", [utils:binary_to_hex(Signature)]),
-    io:format("============DERSignature>~p~n", [utils:binary_to_hex(DERSignature)]),
-    io:format("============Message>~p~n", [utils:binary_to_hex(Message)]),
-    io:format("===============================================================~n"),
 
-    %NIST
-%    SubjectPublicKey = <<4,109,179,245,58,220,135,220,47,241,12,123,252,216,122,209,58,
-%              233,112,9,175,160,101,166,117,126,229,113,179,242,235,177,143,
-%              70,193,214,143,62,222,176,231,75,46,93,84,32,81,231,210,127,80,
-%              149,32,40,96,90,253,239,121,254,159,255,208,57,89>>,
-%    Algorithm = {1,2,840,10045,3,1,7},
+    {ok, SubjectPublicKeyHex} = mnesia_db:euicc_param_get(utils:binary_to_hex(EidValue), signPubKey),
+    SubjectPublicKey = utils:hex_to_binary(SubjectPublicKeyHex),
 
+    {ok, SignAlgo} = mnesia_db:euicc_param_get(utils:binary_to_hex(EidValue), signAlgo),
+    NamedCurve = case SignAlgo of
+		     <<"prime256v1">> ->
+			 {1,2,840,10045,3,1,7};
+		     <<"brainpoolP256r1">> ->
+			 {1,3,36,3,3,2,8,1,1,7};
+		     _ ->
+			 logger:error("invalid SignAlgo configured for eID ~p", [utils:binary_to_hex(EidValue)]),
+			 {}
+		 end,
 
-    %BRP
-%    SubjectPublicKey = <<4,62,89,12,56,169,194,86,49,94,207,243,41,20,22,221,51,84,9,166,
-%              102,253,65,179,181,30,94,81,20,243,67,171,240,162,103,116,198,
-%              194,108,72,117,58,254,40,54,67,34,123,182,96,140,210,97,204,151,
-%              45,55,74,71,145,36,235,242,119,34>>,
-%    Algorithm = {1,3,36,3,3,2,8,1,1,7},
-
-    SubjectPublicKey = <<4,189,44,85,178,139,78,128,28,160,177,79,
-                                   25,87,136,253,134,199,255,73,118,76,136,
-                                   162,147,76,105,89,74,38,255,100,117,73,243,
-                                   241,96,96,189,156,141,121,61,149,208,18,
-                                   111,164,41,201,73,102,254,120,66,150,114,
-                                   99,121,90,115,196,152,241,219>>,
-    Algorithm = {1,2,840,10045,3,1,7},
-
-    ECPublicKey = {{'ECPoint',SubjectPublicKey}, {namedCurve,Algorithm}},
+    ECPublicKey = {{'ECPoint',SubjectPublicKey}, {namedCurve, NamedCurve}},
 
     Result = public_key:verify(Message, sha256, DERSignature, ECPublicKey),
-    io:format("===============================================================~n"),
-    io:format("============Result>~p~n", [Result]),
-    io:format("===============================================================~n"),
-    ok.
+    case Result of
+	true ->
+	    ok;
+	_ ->
+	    logger:error("Signature verification failed for eID ~p, input parameters:~n" ++
+			     "SubjectPublicKey=~p~n" ++
+			     "NamedCurve=~p~n" ++
+			     "Signature=~p~n" ++
+			     "DERSignature=~p~n" ++
+			     "Message=~p", [utils:binary_to_hex(EidValue),
+					      utils:binary_to_hex(SubjectPublicKey),
+					      NamedCurve,
+					      utils:binary_to_hex(Signature),
+					      utils:binary_to_hex(DERSignature),
+					      utils:binary_to_hex(Message)]),
+	    error
+    end.
 
-verify_euiccPackageResultSigned(EuiccPackageResult) ->
+% An experiment to prove that the overall signature verification works, expected return ok, The hex data in this
+% function was generated by triggering a download from the eUICC (EID=89044045118427484800000000011628) and capturing
+% euiccSigned1 and euiccSignature1.
+verify_experiment1() ->
+    EuiccSigned1Hex = <<"3082011e8010aee5074869da4d8fa478124916ad54ed831974657374736d6470706c7573312e6578616d706c652e636f6d8410f6581fc7a6b99c28866b0ffcc41a31c9bf2281ac810302030182030205008303240215840d810100820400049ce8830222238505006b36d3c3860311020087030203008802029ca92c0414f54172bdf98a95d65cbeb88a38a1c11d800a85c30414c0bc70ba36929d43b467ff57570530e57ab8fcd8aa2c0414f54172bdf98a95d65cbeb88a38a1c11d800a85c30414c0bc70ba36929d43b467ff57570530e57ab8fcd804030100000c0f5359534d4f434f4d2d544553542d31af050403030301a02d80215453343856312d422d554e495155452d6e6f6a617661636172642d6e6f6373696da108800412345678a100">>,
+    EuiccSignature1Hex = <<"5f9b24ba9e1b7c8647c22679e1f674d93c79b9c0ae05005c835b95664678b1351a9e1b59849da764acc6f70ae0061a85a8d73f063a78157405beac5e56aad2ec">>,
+    verify_signature(utils:hex_to_binary(EuiccSigned1Hex), utils:hex_to_binary(EuiccSignature1Hex), <<137,4,64,69,17,132,39,72,72,0,0,0,0,1,22,40>>).
 
-    case EuiccPackageResult of
-		  {euiccPackageResultSigned, EuiccPackageResultSigned} ->
-		      EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
-		      {ok, EuiccPackageResultDataSigned_enc} = 'SGP32Definitions':encode('EuiccPackageResultDataSigned', EuiccPackageResultDataSigned),
-		      EuiccSignEPR = maps:get(euiccSignEPR, EuiccPackageResultSigned),
-		      verify_signature(EuiccPackageResultDataSigned_enc, EuiccSignEPR);
-		  {euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
-		      EuiccPackageErrorDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageErrorSigned),
-		      {ok, EuiccPackageErrorDataSigned_enc} = 'SGP32Definitions':encode('EuiccPackageErrorDataSigned', EuiccPackageErrorDataSigned),
-		      EuiccSignEPR = maps:get(euiccSignEPR, EuiccPackageErrorSigned),
-		      verify_signature(EuiccPackageErrorDataSigned_enc, EuiccSignEPR);
-		  {euiccPackageErrorUnsigned, _} ->
-		      ok; % This result has no signature
-		  _ ->
-		      error
+% An experiment to prove that the verfication of signatures also works in the context of eUICC packages. Unfortunately
+% the spec is very vague about how the input data should be prepared. As of now none of the attempts here do work.
+% However since verify_experiment1 works, we can conclude that the key and crypto is correct and it must be the input
+% data that is wrong.
+verify_experiment2() ->
+% The following data was captured from an eUICC package sent to a test eUICC (EID=89044045118427484800000000011628):
+
+% Data captured on the IPAd side
+%TX:
+%BF4F8186BF518182303D800365494D5A1089044045118427484800000000011628810203EE8210F92B2FEE35632499E841CB754FDFD9F3A00EA30C5A0A989444999999990920F35F37408D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223
+%TX(eUICC):
+%BF518182303D800365494D5A1089044045118427484800000000011628810203EE8210F92B2FEE35632499E841CB754FDFD9F3A00EA30C5A0A989444999999990920F35F37408D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223
+%RX:
+%BF5081E23081DFBF516AA0683023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F383011430038301015F37409EB61D189D332FF2DC6FF90A97A9438AB973F04E6FE2F106FA9C7809A36B8A12740E113C583009D3859A3B2EABE6F43409AE46F32CFD34E2D023B2561F9F2311BF2B6FA26DBF516AA0683023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F383011430038301015F37400523BFA5A4F0CAAA1D42637520E2DEF2DDC96FBE775342BB13D3D6EB6AD919951354FB59082675038D949131ECF3AF272F771A085E3C2099DC45C897E9808022
+%RX(eUICC):
+%BF516AA0683023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F383011430038301015F37409EB61D189D332FF2DC6FF90A97A9438AB973F04E6FE2F106FA9C7809A36B8A12740E113C583009D3859A3B2EABE6F43409AE46F32CFD34E2D023B2561F9F2311
+
+% Data captured on the eIM side:
+%============EuiccPackageResultDataSigned_enc><<"3023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F38301143003830101">>
+%============EimSignature><<"8D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223">>
+%============EuiccSignEPR><<"9EB61D189D332FF2DC6FF90A97A9438AB973F04E6FE2F106FA9C7809A36B8A12740E113C583009D3859A3B2EABE6F43409AE46F32CFD34E2D023B2561F9F2311">>
+
+    EuiccSignEPRHex = <<"9EB61D189D332FF2DC6FF90A97A9438AB973F04E6FE2F106FA9C7809A36B8A12740E113C583009D3859A3B2EABE6F43409AE46F32CFD34E2D023B2561F9F2311">>,
+
+%Data objects without tags
+    EuiccPackageResultDataSignedHex = <<"3023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F38301143003830101">>,
+    EimSignatureHex = <<"8D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223">>,
+
+%Both Data objects with tags
+%    EuiccPackageResultDataSignedHex = <<"A0683023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F38301143003830101">>,
+%    EimSignatureHex = <<"5F37408D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223">>,
+
+%Only signature data object with tags
+%    EuiccPackageResultDataSignedHex = <<"3023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F38301143003830101">>,
+%    EimSignatureHex = <<"5F37408D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223">>,
+
+%Only signature data object with tags and the whole eUICC message (without its signature)
+%    EuiccPackageResultDataSignedHex = <<"BF516AA0683023800365494D810203EE8210F92B2FEE35632499E841CB754FDFD9F38301143003830101">>,
+%    EimSignatureHex = <<"5F37408D5DE179B03A3FE13CD3A7E5A947FDDBB831ACC8F9AAFDC9777D314837CB0C805EE3029BF2445611C1580DC4470147DD6293ECA66987BC9A0A704CAB0031B223">>,
+
+    MessageHex = <<EuiccPackageResultDataSignedHex/binary, EimSignatureHex/binary>>,
+    verify_signature(utils:hex_to_binary(MessageHex), utils:hex_to_binary(EuiccSignEPRHex), <<137,4,64,69,17,132,39,72,72,0,0,0,0,1,22,40>>).
+
+verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
+    {ok, ConsumerEuicc} = mnesia_db:euicc_param_get(utils:binary_to_hex(EidValue), consumerEuicc),
+    case ConsumerEuicc of
+	false ->
+	    case EuiccPackageResult of
+		{euiccPackageResultSigned, EuiccPackageResultSigned} ->
+		    EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
+		    EuiccSignEPR = maps:get(euiccSignEPR, EuiccPackageResultSigned),
+		    {ok, EuiccPackageResultDataSigned_enc} = 'SGP32Definitions':encode('EuiccPackageResultDataSigned',
+										       EuiccPackageResultDataSigned),
+		    % "euiccSignEPR SHALL apply on the concatenated data objects euiccPackageResultDataSigned and
+		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageResultDataSigned_enc, EimSignature]),
+		    verify_signature(MsgToBeVerfied, EuiccSignEPR, EidValue);
+		{euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
+		    EuiccPackageErrorDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageErrorSigned),
+		    EuiccSignEPE = maps:get(euiccSignEPR, EuiccPackageErrorSigned),
+		    {ok, EuiccPackageErrorDataSigned_enc} = 'SGP32Definitions':encode('EuiccPackageErrorDataSigned',
+										      EuiccPackageErrorDataSigned),
+		    % "euiccSignEPE SHALL apply on the concatenated data objects euiccPackageErrorDataSigned and
+		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageErrorDataSigned_enc, EimSignature]),
+		    verify_signature(MsgToBeVerfied, EuiccSignEPE, EidValue);
+		{euiccPackageErrorUnsigned, _} ->
+		    ok; % This result has no signature
+		_ ->
+		    error
+	    end;
+	_ ->
+	    logger:notice("omitting signature check for euiccPackageResultSigned from eID ~p (consumer eUICC)",
+			  [utils:binary_to_hex(EidValue)]),
+	    ok
     end.

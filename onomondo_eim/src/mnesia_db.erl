@@ -13,7 +13,7 @@
 -export([work_fetch/2, work_pickup/1, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
 
 % euicc functions, to be called by the eIM code (from inside)
--export([euicc_counter_tick/1, euicc_counter_get/1]).
+-export([euicc_counter_tick/1, euicc_counter_get/1, euicc_param_get/2]).
 
 % debugging
 -export([dump_rest/0, dump_work/0, dump_euicc/0]).
@@ -23,7 +23,12 @@
 
 -record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
 -record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), eidValue :: binary(), order, state}).
--record(euicc, {eidValue :: binary(), counterValue :: integer(), consumerEuicc :: boolean()}).
+-record(euicc, {eidValue :: binary(),
+		counterValue :: integer(),
+		consumerEuicc :: boolean(),
+		associationToken :: integer(),
+		signPubKey :: binary(),
+		signAlgo :: binary()}).
 
 %TODO: We need some mechanism that looks through the work table from time to time and checks the timestemp (field not
 %yet created in work) to find stuck work items. We also might also need a similar mechanism for the rest table that
@@ -387,7 +392,12 @@ work_finish(Pid, Outcome, Debuginfo) ->
 
 trans_euicc_create_if_not_exist(EidValue) ->
     {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
-    Row = #euicc{eidValue=EidValue, counterValue=CounterValue, consumerEuicc=false},
+    Row = #euicc{eidValue = EidValue,
+		 counterValue = CounterValue,
+		 consumerEuicc = true,
+		 associationToken = 1,
+		 signPubKey = <<>>,
+		 signAlgo = <<"prime256v1">>},
     Q = qlc:q([X#euicc.eidValue || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
     Present = qlc:e(Q),
     case Present of
@@ -462,6 +472,43 @@ euicc_counter_get(EidValue) ->
 	    {ok, CounterValue};
 	_ ->
 	    logger:error("eUICC: cannot read current counterValue, database error: eID=~p", [EidValue]),
+	    error
+    end.
+
+euicc_param_get(EidValue, Name) ->
+    Trans = fun() ->
+		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+		    Rows = qlc:e(Q),
+		    case Rows of
+			[Row | _] ->
+			    case Name of
+				counterValue ->
+				    {ok, Row#euicc.counterValue};
+				consumerEuicc ->
+				    {ok, Row#euicc.consumerEuicc};
+				associationToken ->
+				    {ok, Row#euicc.associationToken};
+				signPubKey ->
+				    {ok, Row#euicc.signPubKey};
+				signAlgo ->
+				    {ok, Row#euicc.signAlgo};
+				_ ->
+				    error
+			    end;
+			[] ->
+			    error;
+			_ ->
+			    error
+		    end
+	    end,
+
+    {atomic , Result} = mnesia:transaction(Trans),
+    case Result of
+        {ok, Value} ->
+	    logger:notice("eUICC: reading eUICC parameter: eID=~p, name=~p, value=~p", [EidValue, Name, Value]),
+	    {ok, Value};
+	_ ->
+	    logger:error("eUICC: cannot read eUICC parameter: eID=~p, name=~p", [EidValue, Name]),
 	    error
     end.
 
@@ -601,6 +648,12 @@ euicc_setparam() ->
 					       mnesia:write(Row#euicc{counterValue=Value});
 					   <<"consumerEuicc">> ->
 					       mnesia:write(Row#euicc{consumerEuicc=Value});
+					   <<"associationToken">> ->
+					       mnesia:write(Row#euicc{associationToken=Value});
+					   <<"signPubKey">> ->
+					       mnesia:write(Row#euicc{signPubKey=Value});
+					   <<"signAlgo">> ->
+					       mnesia:write(Row#euicc{signAlgo=Value});
 					   _ ->
 					       error
 				       end;

@@ -447,14 +447,21 @@ This is why the REST API allows to modify the contents of the `euicc` table via 
 
 The `euicc` table maintains the following columns:
 
-* `eidValue` the EID of the related eUICC
-* `counterValue` the conter value that is used when signing eUICC packages
-* `consumerEuicc` a flag to tell the eIM that the eUICC on the remote end is a consumer eUICC using an IoT eUICC
+* `eidValue`: the EID of the related eUICC
+* `counterValue`: the conter value that is used when signing eUICC packages
+* `consumerEuicc`: a flag to tell the eIM that the eUICC on the remote end is a consumer eUICC using an IoT eUICC
   emulation mode.
+* `associationToken`: an integer number to associate an eIM configuration on the eUICC with this eIM
+* `signPubKey`: set the public key used to verify eUICC package responses (only relevant for IoT eUICCs)
+* `signAlgo`: set the algorithm used to verify eUICC package responses (only relevant for IoT eUICCs)
 
 Example: displaying the contents of the `euicc` table on the erlang shell
 ```
-(onomondo_eim@127.0.0.1)6> mnesia_db:dump_euicc().
-[{euicc,<<"89012345622310000000000006803372">>,1,false},
- {euicc,<<"89234567800000000000000000000005">>,3,false}]
+(onomondo_eim@127.0.0.1)2> mnesia_db:dump_euicc().
+[{euicc,<<"89123456789027484800000000011628">>,1000,false,1,
+        <<"04BD2C55B28B4E801CA0B14F1912345676C7FF49764C88A2934C695912345F647549F3F16060BD9C8D793D95"...>>,
+        <<"prime256v1">>},
+ {euicc,<<"89123456900000000000000000000005">>,12,true,1,
+        <<>>,<<"prime256v1">>}]
+(onomondo_eim@127.0.0.1)3>
 ```

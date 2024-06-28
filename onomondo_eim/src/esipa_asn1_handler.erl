@@ -216,29 +216,31 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			TransactionIdPsmo = rand:bytes(16),
 			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdPsmo),
 			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue, TransactionIdPsmo),
-			mnesia_db:work_update(maps:get(pid, Req0), #{}),
 			case EuiccPackageSigned of
 			    error ->
 				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badPsmo}]}], EsipaReq),
 				{eimPackageError, undefinedError};
 			    _ ->
+				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned, EidValue),
+				mnesia_db:work_update(maps:get(pid, Req0), #{eimSignature => EimSignature, eidValue => EidValue}),
 				{euiccPackageRequest,
 				 #{euiccPackageSigned => EuiccPackageSigned,
-				   eimSignature => crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned)}}
+				   eimSignature => EimSignature}}
 			end;
 		    {eco, Order} ->
 			TransactionIdEco = rand:bytes(16),
 			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdEco),
 			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue, TransactionIdEco),
-			mnesia_db:work_update(maps:get(pid, Req0), #{}),
 			case EuiccPackageSigned of
 			    error ->
 				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEco}]}], EsipaReq),
 				{eimPackageError, undefinedError};
 			    _ ->
+				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned, EidValue),
+				mnesia_db:work_update(maps:get(pid, Req0), #{eimSignature => EimSignature, eidValue => EidValue}),
 				{euiccPackageRequest,
 				 #{euiccPackageSigned => EuiccPackageSigned,
-				   eimSignature => crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned)}}
+				   eimSignature => EimSignature}}
 			end;
 		    none ->
 			{eimPackageError, noEimPackageAvailable};
@@ -250,14 +252,28 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.7
 handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
-    % TODO: some of the contents of provideEimPackageResult contain ECDSA signatures. Verify those signatures.
+    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
     case EsipaReq of
 	{euiccPackageResult, EuiccPackageResult} ->
-	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+	    EimSignature = maps:get(eimSignature, WorkState),
+	    EidValue = maps:get(eidValue, WorkState),
+	    ok = case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) of
+		     ok ->
+			 esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+		     _ ->
+			 mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq)
+		 end;
 	{ePRAndNotifications, EPRAndNotifications} ->
 	    % TODO: Do something useful with the notificationList, that is also included in this response
 	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
-	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+	    EimSignature = maps:get(eimSignature, WorkState),
+	    EidValue = maps:get(eidValue, WorkState),
+	    ok = case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) of
+		     ok ->
+			 esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+		     _ ->
+			 mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq)
+		 end;
 	{ipaEuiccDataResponse, _} ->
 	    throw("TODO: Implement handling of incoming EuiccDataResponse");
 	{profileDownloadTriggerResult, _} ->

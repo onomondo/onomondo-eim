@@ -1,7 +1,7 @@
 % Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
 
 -module(utils).
--export([binary_to_hex/1, hex_to_binary/1, join_binary_list/1]).
+-export([binary_to_hex/1, hex_to_binary/1, join_binary_list/1, integer_to_bytes/1, lpad_binary/3]).
 
 % Converts a single hex digit (e.g. <<"A">>) into its integer representation.
 hexstr_digit_to_int(HexDigit) ->
@@ -57,3 +57,28 @@ join_binary_list([H|T]) ->
 join_binary_list(Binary) ->
     % In case someone uses this function on a binary directly, we transparently return that binary.
     Binary.
+
+% Convert an integer into a binary that contains the integer as a series of bytes (network byte order)
+integer_to_bytes(Integer) ->
+    % Convert the integer to a list with hex digits (nibbles)
+    IntegerDigits = integer_to_list(Integer, 16),
+    % Make sure that the list contains an even number of digits (nibbles)
+    IntegerDigitsPadded = case length(IntegerDigits) rem 2 of
+			      1 ->
+				  ["0" | IntegerDigits];
+			      _ ->
+				  IntegerDigits
+			  end,
+    % Merge the list of hex digits into a single hex string (binary) and convert that binary into a binary
+    IntegerAsHexstring = list_to_binary(IntegerDigitsPadded),
+    hex_to_binary(IntegerAsHexstring).
+
+% Padd a binary from the left with a specified padding byte
+lpad_binary(Binary, Padding, Length) ->
+    if
+	byte_size(Binary) >= Length ->
+	    Binary;
+	true ->
+	    BinaryPadded = <<Padding/binary, Binary/binary>>,
+	    lpad_binary(BinaryPadded, Padding, Length)
+    end.

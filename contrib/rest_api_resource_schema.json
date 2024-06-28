@@ -231,6 +231,21 @@
 			    "consumerEuicc": {
 				"description": "tells the eIM that the remote end (IPAd) uses a consumer eUICC with an IoT eUICC emulation mode",
 				"type": "boolean"
+			    },
+			    "associationToken": {
+				"description": "association token that the eUICC uses to identify this eIM internally",
+				"type": "integer"
+			    },
+			    "signAlgo": {
+				"description": "algorithm to be used for checking eUICC package results",
+				"type": "string",
+				"enum": ["prime256v1",
+					 "brainpoolP256r1"]
+			    },
+			    "signPubKey": {
+				"description": "public key to be used for checking eUICC package results",
+				"type": "string",
+				"pattern": "^[0-9,A-F]{2,32}$"
 			    }
 			}
 		    }
