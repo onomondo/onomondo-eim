@@ -114,7 +114,11 @@ init() ->
     Trans = fun() ->
 		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work]),
 		    ResourceIds = qlc:e(Q),
-		    lists:foreach(fun(ResourceId) -> trans_rest_set_status(ResourceId, done, [{[{procedureError, abortedOrder}]}], none) end, ResourceIds)
+		    lists:foreach(fun(ResourceId) ->
+					  trans_rest_set_status(ResourceId, done,
+								[{[{procedureError, abortedOrder}]}], none)
+				  end,
+				  ResourceIds)
 	    end,
     {atomic, ok} = mnesia:transaction(Trans),
 
@@ -147,7 +151,8 @@ rest_create(Facility, EidValue, Order) ->
 % Lookup REST resource (order)
 rest_lookup(ResourceId, Facility) ->
     Trans = fun() ->
-		    Q = qlc:q([{X#rest.status, X#rest.timestamp, X#rest.eidValue, X#rest.order, X#rest.outcome, X#rest.debuginfo} ||
+		    Q = qlc:q([{X#rest.status, X#rest.timestamp, X#rest.eidValue,
+				X#rest.order, X#rest.outcome, X#rest.debuginfo} ||
 				  X <- mnesia:table(rest),
 				  X#rest.resourceId == ResourceId, X#rest.facility == Facility]),
 		    qlc:e(Q)
@@ -238,7 +243,8 @@ work_fetch(EidValue, Pid) ->
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
 	{rest, _, Facility, _, Order, _, _, _, _} ->
-	    logger:notice("Work: fetching new work item: EidValue=~p, Pid=~p, Order=~p, Facility=~p", [EidValue, Pid, Order, Facility]),
+	    logger:notice("Work: fetching new work item: EidValue=~p, Pid=~p, Order=~p, Facility=~p",
+			  [EidValue, Pid, Order, Facility]),
 	    {Facility, Order};
 	none ->
 	    logger:notice("Work: no work item in database: EidValue=~p, Pid=~p", [EidValue, Pid]),
@@ -325,7 +331,8 @@ work_pickup(Pid, TransactionId) ->
 
     % Lookup the work state by the given PID
     Trans = fun() ->
-		    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} || X <- mnesia:table(work), X#work.pid == Pid]),
+		    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} ||
+				  X <- mnesia:table(work), X#work.pid == Pid]),
 		    qlc:e(Q)
 	    end,
     {atomic, Result} = mnesia:transaction(Trans),
@@ -333,7 +340,8 @@ work_pickup(Pid, TransactionId) ->
 	[{EidValue, Order, State} | _] ->
 	    {EidValue, Order, State};
 	[] ->
-	    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?: Pid=~p", [Pid]),
+	    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?: Pid=~p",
+			 [Pid]),
 	    none;
 	_ ->
 	    logger:error("Work: cannot pick up work item, database error: Pid=~p", [Pid]),
@@ -388,7 +396,8 @@ work_finish(Pid, Outcome, Debuginfo) ->
 	    logger:notice("Work: finishing work item: Pid=~p, Outcome=~p, Debuginfo=~p", [Pid, Outcome, Debuginfo]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p, Debuginfo=~p", [Pid, Outcome, Debuginfo]),
+	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p, Debuginfo=~p",
+			 [Pid, Outcome, Debuginfo]),
 	    error
 	end.
 
@@ -568,7 +577,9 @@ mark_noshow(Timeout) ->
 
     % Find all rest resources that stall in status "work" and older than the specified timeout value
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == new, TimestampNow - X#rest.timestamp > Timeout]),
+		    Q = qlc:q([X#rest.resourceId ||
+				  X <- mnesia:table(rest), X#rest.status == new,
+				  TimestampNow - X#rest.timestamp > Timeout]),
 		    Rows = qlc:e(Q),
 		    case Rows of
 			[] ->
@@ -598,7 +609,9 @@ delete_expired(Timeout) ->
 
     % Find all rest resources that linger in the rest table for a long time and are not in the status "new"
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == done, TimestampNow - X#rest.timestamp > Timeout]),
+		    Q = qlc:q([X#rest.resourceId ||
+				  X <- mnesia:table(rest),
+				  X#rest.status == done, TimestampNow - X#rest.timestamp > Timeout]),
 		    Rows = qlc:e(Q),
 		    case Rows of
 			[] ->
@@ -670,12 +683,15 @@ euicc_setparam() ->
 			      {[{Name, Value}]} ->
 				  case UpdateEuiccParam(EidValue, Name, Value) of
 				      ok ->
-					  trans_rest_set_status(ResourceId, done, [{[{euiccUpdateResult, ok}]}], none);
+					  trans_rest_set_status(ResourceId, done,
+								[{[{euiccUpdateResult, ok}]}], none);
 				      _ ->
-					  trans_rest_set_status(ResourceId, done, [{[{euiccUpdateResult, badParam}]}], none)
+					  trans_rest_set_status(ResourceId, done,
+								[{[{euiccUpdateResult, badParam}]}], none)
 				  end;
 			      _ ->
-				  trans_rest_set_status(ResourceId, done, [{[{euiccUpdateResult, badParamFormat}]}], none)
+				  trans_rest_set_status(ResourceId, done,
+							[{[{euiccUpdateResult, badParamFormat}]}], none)
 			  end
 		  end,
 
@@ -693,7 +709,8 @@ euicc_setparam() ->
 
     % Look into facility euicc and find the first entry that is in status "new".
     Trans = fun() ->
-		    Q = qlc:q([{X#rest.resourceId, X#rest.eidValue, X#rest.order} || X <- mnesia:table(rest), X#rest.status == new, X#rest.facility == euicc]),
+		    Q = qlc:q([{X#rest.resourceId, X#rest.eidValue, X#rest.order} ||
+				  X <- mnesia:table(rest), X#rest.status == new, X#rest.facility == euicc]),
 		    Rows = qlc:e(Q),
 		    case Rows of
 			[] ->
