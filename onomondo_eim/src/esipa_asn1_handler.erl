@@ -15,7 +15,7 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
     % However in ES9+ those fields are mandatory. This means we may need to fill in those fields here, from cached
     % values.
 
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
+    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
     BaseUrl = maps:get(smdpAddress, EsipaReq),
     NewWorkState = WorkState#{smdpAddress => BaseUrl},
     mnesia_db:work_update(maps:get(pid, Req0), NewWorkState),
@@ -147,39 +147,43 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.4
 handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
-    BaseUrl = maps:get(smdpAddress, WorkState),
-
     case EsipaReq of
 	{pendingNotification, PendingNotif} ->
-            % setup ES9+ request message
-	    Es9Req = case PendingNotif of
-			 {profileInstallationResult, PrfleInstRslt} ->
-			     Outcome = esipa_rest_utils:profileInstallationResult_to_outcome(PrfleInstRslt),
-			     ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
-			     % SGP32-ProfileInstallationResult and ProfileInstallationResult share the
-			     % exact same definition, so we may convert without an extra case statement.
-			     PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
-			     TransactionId = maps:get(transactionId, PrfleInstRsltData),
-			     mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
-			     {handleNotification, #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}};
-			 {otherSignedNotification, OtherSignNotif} ->
-			     Outcome = esipa_rest_utils:otherSignedNotification_to_outcome(OtherSignNotif),
-			     ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
-			     % TODO: An otherSignedNotification does not contain a TransactionId. However it contains
-			     % an SMDP+ OID. Maybe we can at least use this OID to lookup the BaseUrl. In any case we
-			     % won't be able to lookup a specific WorkState here. (do we even need it in this case?)
-			     {handleNotification, #{pendingNotification => {otherSignedNotification, OtherSignNotif}}};
-			 {compactProfileInstallationResult, _CompactPrfleInstRslt} ->
-			     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM");
-			 {compactOtherSignedNotification, _CompactOtherSignNotif} ->
-			     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
+	    Rc = case PendingNotif of
+		     {profileInstallationResult, PrfleInstRslt} ->
+			 PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
+			 TransactionId = maps:get(transactionId, PrfleInstRsltData),
+			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+			 Oc = esipa_rest_utils:profileInstallationResult_to_outcome(PrfleInstRslt),
+			 Eq = {handleNotification,
+			       #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}},
+			 {Ws, Oc, Eq};
+		     {otherSignedNotification, OtherSignNotif} ->
+			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
+			 Oc = esipa_rest_utils:otherSignedNotification_to_outcome(OtherSignNotif),
+			 Eq = {handleNotification,
+			       #{pendingNotification => {otherSignedNotification, OtherSignNotif}}},
+			 {Ws, Oc, Eq};
+		     {compactProfileInstallationResult, _CompactPrfleInstRslt} ->
+		         % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
+			 Oc = [{[{procedureError, handleNotificationError}]}],
+			 Eq = {}, % Not supported
+			 {Ws, Oc, Eq};
+		     {compactOtherSignedNotification, _CompactOtherSignNotif} ->
+			 % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
+			 Oc = [{[{procedureError, handleNotificationError}]}],
+			 Eq = {}, % Not supported
+			 {Ws, Oc, Eq}
 		     end,
+	    {WorkState, Outcome, Es9Req} = Rc,
 
             % perform ES9+ request (We expect an empty response in this case)
+	    BaseUrl = maps:get(smdpAddress, WorkState),
 	    case es9p_client:request_json(Es9Req, BaseUrl) of
 		{} ->
-		    ok;
+		    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
 		_ ->
 		    ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, handleNotificationError}]}], EsipaReq)
 	    end;
@@ -252,28 +256,13 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.7
 handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0)),
     case EsipaReq of
 	{euiccPackageResult, EuiccPackageResult} ->
-	    EimSignature = maps:get(eimSignature, WorkState),
-	    EidValue = maps:get(eidValue, WorkState),
-	    ok = case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) of
-		     ok ->
-			 esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
-		     _ ->
-			 mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq)
-		 end;
+	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
 	{ePRAndNotifications, EPRAndNotifications} ->
 	    % TODO: Do something useful with the notificationList, that is also included in this response
 	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
-	    EimSignature = maps:get(eimSignature, WorkState),
-	    EidValue = maps:get(eidValue, WorkState),
-	    ok = case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) of
-		     ok ->
-			 esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
-		     _ ->
-			 mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq)
-		 end;
+	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
 	{ipaEuiccDataResponse, _} ->
 	    throw("TODO: Implement handling of incoming EuiccDataResponse");
 	{profileDownloadTriggerResult, _} ->

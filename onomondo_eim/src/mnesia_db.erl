@@ -10,7 +10,7 @@
 -export([rest_list/1, rest_lookup/2, rest_create/3, rest_delete/2]).
 
 % work functions, to be called by the eIM code (from inside)
--export([work_fetch/2, work_pickup/1, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
+-export([work_fetch/2, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
 
 % euicc functions, to be called by the eIM code (from inside)
 -export([euicc_counter_tick/1, euicc_counter_get/1, euicc_param_get/2]).
@@ -318,7 +318,16 @@ work_bind(Pid, TransactionId) ->
 
 % Pickup a work item that is in progress. This function can be called any time after work_fetch was called
 % before. It can also be called multiple times.
-work_pickup(Pid) ->
+work_pickup(Pid, TransactionId) ->
+    % In case a TransactionId is provied, bind the PID to this TransactionId,
+    case TransactionId of
+	none ->
+	    ok;
+	_ ->
+	    ok = work_bind(Pid, TransactionId)
+    end,
+
+    % Lookup the work state by the given PID
     Trans = fun() ->
 		    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} || X <- mnesia:table(work), X#work.pid == Pid]),
 		    qlc:e(Q)
@@ -334,9 +343,6 @@ work_pickup(Pid) ->
 	    logger:error("Work: cannot pick up work item, database error: Pid=~p", [Pid]),
 	    error
     end.
-work_pickup(Pid, TransactionId) ->
-    ok = work_bind(Pid, TransactionId),
-    work_pickup(Pid).
 
 % Update a work item that is in progress. This fuction updates the state (any user defined term) of the work item.
 % This function can be called any time after work_fetch was called before. It can also be called multiple times.
