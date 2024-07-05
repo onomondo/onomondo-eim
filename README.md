@@ -255,7 +255,7 @@ Example: A typical `list` response with three `resourceIDs`
 ```
 {"resourceIdList": ["2100f52e-83e1-4fed-9d30-f309daf3391a","35074412-654b-4d7b-aec0-e159837b998f","9d6b14df-1875-4827-8236-916383972a19"]}
 ```
-y
+
 #### eIM Information
 
 The REST API also features an info page which can be used by the REST API user to gain some basic information of the eIM
@@ -298,7 +298,7 @@ REST API is called without any parameters.
 ### Tyring Out The REST API
 
 The REST API is complex interface that is difficult to operate out of the box without any prior familiarization. To
-give a system integrator a good starting point the contrib directory contains "tryme-scripts" that serve as examples
+give a system integrator a good starting point, the contrib directory contains "tryme-scripts" that serve as examples
 and an easy way try out the REST API right away.
 
 There is a tryme script to `create` downloads (tryme_download.sh) and one tryme script per PSMO/eCO. The scripts are
