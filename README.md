@@ -49,11 +49,44 @@ The build process is started using `make`. The overall process may take a while 
 downloading and compiling further erlang related dependencies. The build process can also be started with `make run`.
 This will start the application immediately after finishing the compilation.
 
+A typical output after the first startup
+```
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.860556 ===
+eIM!
+=INFO REPORT==== 5-Jul-2024::15:21:12.861087 ===
+    application: mnesia
+    exited: stopped
+    type: permanent
+
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.876779 ===
+    mnesia database schema created
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.879914 ===
+    mnesia started
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.881926 ===
+    rest table created
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.883425 ===
+    work table created
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.885645 ===
+    euicc table created
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.886064 ===
+Starting ESipa HTTPs server at {127,0,0,1}:8000...
+certificate: "../../config/sample_ssl_cert.crt"
+key: "../../config/sample_ssl_cert.key"
+=NOTICE REPORT==== 5-Jul-2024::15:21:12.886915 ===
+Starting REST HTTP server at {127,0,0,1}:8080...
+Eshell V13.1.5  (abort with ^G)
+(onomondo_eim@127.0.0.1)1>
+```
+
 Once the application is running it will display a prompt. To exit the application type `CTRL+G` and then `q`.
 
 (To run onomondo-eim under the control of `systemd`, the example service file /contrib/onomondo-eim.service may be
 used)
 
+To verify that the ESipa interface is reachable it can be probed using a webbrowser. In the example above, the ESipa
+interface runs on 127.0.0.1, port 8000 and uses SSL. It can be probed by typing "https://127.0.0.1:8000/" into the
+address line of a webbrowser. The result should be the string "eIM working!". The REST interface can be probed with
+the same method (see section "eIM Information").
 
 Configuration
 -------------
