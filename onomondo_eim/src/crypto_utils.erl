@@ -5,7 +5,7 @@
 
 -module(crypto_utils).
 
--export([sign_euiccPackageSigned/2, verify_euiccPackageResultSigned/3]).
+-export([sign_euiccPackageSigned/2, verify_euiccPackageResultSigned/3, store_euicc_pubkey_from_authenticateResponseOk/2]).
 
 %temporary, for debugging
 -export([der_to_plain/1, plain_to_der/1, verify_experiment1/0, verify_experiment2/0]).
@@ -167,5 +167,84 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
 	_ ->
 	    logger:notice("omitting signature check for euiccPackageResultSigned from eID ~p (consumer eUICC)",
 			  [utils:binary_to_hex(EidValue)]),
+	    ok
+    end.
+
+pubkey_from_cert(Cert) ->
+    TbsCertificate = maps:get(tbsCertificate, Cert),
+    SubjectPublicKeyInfo = maps:get(subjectPublicKeyInfo, TbsCertificate),
+    Algorithm = maps:get(algorithm, SubjectPublicKeyInfo),
+    SubjectPublicKey = maps:get(subjectPublicKey, SubjectPublicKeyInfo),
+    BrainpoolP256r1 = #{algorithm => {1,2,840,10045,2,1},
+                        parameters => <<6,9,43,36,3,3,2,8,1,1,7>>},
+    Prime256v1 = #{algorithm => {1,2,840,10045,2,1},
+		   parameters => <<6,8,42,134,72,206,61,3,1,7>>},
+    NamedCurve = case Algorithm of
+		     Prime256v1 ->
+			 {1,2,840,10045,3,1,7};
+		     BrainpoolP256r1 ->
+			 {1,3,36,3,3,2,8,1,1,7};
+		     _ ->
+			 throw("Incorrect root CI certificate, only BrainpoolP256r1 or Prime256v1 may be used!")
+		 end,
+    {{'ECPoint', SubjectPublicKey}, {namedCurve, NamedCurve}}.
+
+verify_cert(TrustedCert, VerifyCert) ->
+    {ok, VerifyCertBer} = 'PKIX1Explicit88':encode('Certificate', VerifyCert),
+    ECPublicKey = pubkey_from_cert(TrustedCert),
+    Result = public_key:pkix_verify(VerifyCertBer, ECPublicKey),
+    case Result of
+	true ->
+	    ok;
+	_ ->
+	    logger:error("Certificate verification failed:~nCert:~p~nECPublicKey:~p", [VerifyCert, ECPublicKey]),
+	    error
+    end.
+
+store_euicc_pubkey_from_authenticateResponseOk(AuthRespOk, EidValue) ->
+    case mnesia_db:euicc_param_get(utils:binary_to_hex(EidValue), signPubKey) of
+	{ok, <<>>} ->
+	% There is no public key stored yet for this eUICC, use the public
+	% key provided in the eUICC certificate
+
+	    {ok, RootCiCertPath} = application:get_env(onomondo_eim, root_ci_cert),
+	    {ok, RootCiCertPem} = file:read_file(RootCiCertPath),
+	    [{'Certificate', RootCiCertBer, not_encrypted}] = public_key:pem_decode(RootCiCertPem),
+	    {ok, RootCiCert} = 'PKIX1Explicit88':decode('Certificate', RootCiCertBer),
+	    EumCertificate =  maps:get(eumCertificate, AuthRespOk),
+	    EuiccCertificate = maps:get(euiccCertificate, AuthRespOk),
+
+	    Result = case verify_cert(RootCiCert, EumCertificate) of
+			 ok ->
+			     case verify_cert(EumCertificate, EuiccCertificate) of
+				 ok ->
+				     ok;
+				 _ ->
+				     error
+			     end;
+			 _ ->
+			     error
+		     end,
+
+	    {{'ECPoint', SignPubKey}, {namedCurve, NamedCurve}} = pubkey_from_cert(EuiccCertificate),
+	    SignAlgo = case NamedCurve of
+			   {1,2,840,10045,3,1,7} ->
+			       <<"prime256v1">>;
+			   {1,3,36,3,3,2,8,1,1,7} ->
+			       <<"brainpoolP256r1">>;
+			   _ ->
+			       <<"unknown">>
+		       end,
+
+	    case Result of
+		ok ->
+		    ok = mnesia_db:euicc_param_set(utils:binary_to_hex(EidValue), signPubKey, utils:binary_to_hex(SignPubKey)),
+		    ok = mnesia_db:euicc_param_set(utils:binary_to_hex(EidValue), signAlgo, SignAlgo),
+		    ok;
+		_ ->
+		    error
+	    end;
+	_ ->
+	    % There is already a public key stored for this eUICC
 	    ok
     end.

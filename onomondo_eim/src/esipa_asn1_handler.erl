@@ -51,6 +51,9 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
     AuthServResp = maps:get(authenticateServerResponse, EsipaReq),
     Es9Req = case AuthServResp of
 		 {authenticateResponseOk, AuthRespOk} ->
+		     % drive-by store the eUICC public key so that we can use it later to sign PSMOs or eCOs
+		     EidValue = maps:get(eidValue, WorkState),
+		     crypto_utils:store_euicc_pubkey_from_authenticateResponseOk(AuthRespOk, EidValue),
 		     {authenticateClientRequest,
 		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseOk, AuthRespOk}}};
@@ -214,7 +217,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
     EsipaResp = case Work of
 		    {download, Order} ->
 			{[{<<"download">>, {[{<<"activationCode">>, ActivationCode}]}}]} = Order,
-			mnesia_db:work_update(maps:get(pid, Req0), #{}),
+			mnesia_db:work_update(maps:get(pid, Req0), #{eidValue => EidValue}),
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
 		    {psmo, Order} ->
 			TransactionIdPsmo = rand:bytes(16),

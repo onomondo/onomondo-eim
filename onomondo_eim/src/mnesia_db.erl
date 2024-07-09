@@ -13,7 +13,7 @@
 -export([work_fetch/2, work_pickup/2, work_update/2, work_bind/2, work_finish/3]).
 
 % euicc functions, to be called by the eIM code (from inside)
--export([euicc_counter_tick/1, euicc_counter_get/1, euicc_param_get/2]).
+-export([euicc_counter_tick/1, euicc_counter_get/1, euicc_param_get/2, euicc_param_set/3]).
 
 % debugging
 -export([dump_rest/0, dump_work/0, dump_euicc/0]).
@@ -481,6 +481,7 @@ euicc_counter_tick(EidValue) ->
 	    error
     end.
 
+% TODO: this function is obsoleted by euicc_param_get, remove it
 euicc_counter_get(EidValue) ->
     Trans = fun() ->
 		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
@@ -505,6 +506,33 @@ euicc_counter_get(EidValue) ->
 	    error
     end.
 
+%update one specific parameter in the euicc table
+trans_update_euicc_param(EidValue, Name, Value) ->
+    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+    Rows = qlc:e(Q),
+    case Rows of
+	[Row | []] ->
+	    case Name of
+		counterValue ->
+		    mnesia:write(Row#euicc{counterValue=Value});
+		consumerEuicc ->
+		    mnesia:write(Row#euicc{consumerEuicc=Value});
+		associationToken ->
+		    mnesia:write(Row#euicc{associationToken=Value});
+		signPubKey ->
+		    mnesia:write(Row#euicc{signPubKey=Value});
+		signAlgo ->
+		    mnesia:write(Row#euicc{signAlgo=Value});
+		_ ->
+		    error
+	    end;
+	[] ->
+	    error;
+	_ ->
+	    error
+    end.
+
+% Get an eUICC parameter by its name (atom)
 euicc_param_get(EidValue, Name) ->
     Trans = fun() ->
 		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
@@ -539,6 +567,21 @@ euicc_param_get(EidValue, Name) ->
 	    {ok, Value};
 	_ ->
 	    logger:error("eUICC: cannot read eUICC parameter: eID=~p, name=~p", [EidValue, Name]),
+	    error
+    end.
+
+% Update an eUICC parameter by its name (atom)
+euicc_param_set(EidValue, Name, Value) ->
+    Trans = fun() ->
+		    trans_update_euicc_param(EidValue, Name, Value)
+	    end,
+    {atomic , Result} = mnesia:transaction(Trans),
+    case Result of
+        ok ->
+	    logger:notice("eUICC: writing eUICC parameter: eID=~p, name=~p, value=~p", [EidValue, Name, Value]),
+	    ok;
+	_ ->
+	    logger:error("eUICC: cannot write eUICC parameter: eID=~p, name=~p", [EidValue, Name]),
 	    error
     end.
 
@@ -671,36 +714,10 @@ euicc_setparam() ->
     % GSMA SGP.22 or SGP.32. In this module an eUICC procedure is a virtual procedure were parameters in the
     % euicc table are set.
 
-    %update one specific parameter
-    UpdateEuiccParam = fun(EidValue, Name, Value) ->
-			       Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
-			       Rows = qlc:e(Q),
-			       case Rows of
-				   [Row | []] ->
-				       case Name of
-					   <<"counterValue">> ->
-					       mnesia:write(Row#euicc{counterValue=Value});
-					   <<"consumerEuicc">> ->
-					       mnesia:write(Row#euicc{consumerEuicc=Value});
-					   <<"associationToken">> ->
-					       mnesia:write(Row#euicc{associationToken=Value});
-					   <<"signPubKey">> ->
-					       mnesia:write(Row#euicc{signPubKey=Value});
-					   <<"signAlgo">> ->
-					       mnesia:write(Row#euicc{signAlgo=Value});
-					   _ ->
-					       error
-				       end;
-				   [] ->
-				       error;
-				   _ ->
-				       error
-			       end
-		       end,
     HandleParam = fun(ResourceId, EidValue, Param) ->
 			  case Param of
 			      {[{Name, Value}]} ->
-				  case UpdateEuiccParam(EidValue, Name, Value) of
+				  case trans_update_euicc_param(EidValue, binary_to_atom(Name), Value) of
 				      ok ->
 					  trans_rest_set_status(ResourceId, done,
 								[{[{euiccUpdateResult, ok}]}], none);
