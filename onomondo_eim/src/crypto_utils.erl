@@ -214,6 +214,22 @@ store_euicc_pubkey_from_authenticateResponseOk(AuthRespOk, EidValue) ->
 	    EumCertificate =  maps:get(eumCertificate, AuthRespOk),
 	    EuiccCertificate = maps:get(euiccCertificate, AuthRespOk),
 
+	    % TODO: The certificate chain validation done here only performs a basic signature validation. However, a
+	    % spec compliant certifiate chain verification should include:
+	    %
+	    % * expiration dates: no certificate in the chain must be expired.
+	    % * CRL (certificate revocation lists, indicated in the CI cert): no revoked cert should be accepted.
+	    % * serial number constraint of EUM certificate: first 8 digits of EID of eUICC certificate must be within
+	    %   scope of EUM certificate.
+	    % * CA certificate must
+	    %   - have extension for basic constraints CA=true
+	    %   - have extension for key usage "keyCertSign"
+	    % * EUM certificate must
+	    %   - have extension for basic constraints CA=true, pathLenConstraint == 0
+	    %   - have extension for key usage "keyCertSign"
+	    % * eUICC certificate must
+	    %   - have extension for key usage "digitalSignature"
+
 	    Result = case verify_cert(RootCiCert, EumCertificate) of
 			 ok ->
 			     case verify_cert(EumCertificate, EuiccCertificate) of
