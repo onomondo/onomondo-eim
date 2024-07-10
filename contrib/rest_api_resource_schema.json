@@ -220,6 +220,21 @@
 			}
 		    }
 		},{
+		    "edr": {
+			"description": "order to perform an IpaEuiccDataRequest",
+			"type": "object",
+			"properties": {
+			    "tagList": {
+				"description": "see GSMA SGP.32, section 2.11.1.2",
+				"type": "string",
+				"pattern": "^[0-9,A-F]{2,32}$"
+			    },
+			    "required": [
+				"tagList"
+			    ]
+			}
+		    }
+		},{
 		    "euicc": {
 			"description": "set a parameter in the euicc master data table",
 			"type": "array",

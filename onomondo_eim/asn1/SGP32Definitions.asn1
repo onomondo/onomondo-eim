@@ -273,7 +273,7 @@ EimIdInfo ::= SEQUENCE {
 
 -- Section 2.11.2.2
 -- ASN1START
-IpaEuiccDataResponse ::= [82] CHOICE { -- Tag 'BF52'
+IpaEuiccDataResponse ::= CHOICE { -- Tag 'BF52'
   ipaEuiccData IpaEuiccData,
   ipaEuiccDataError INTEGER {
     incorrectTagList (1),

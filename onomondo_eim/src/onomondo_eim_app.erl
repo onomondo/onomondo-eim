@@ -75,6 +75,11 @@ start(_Type, _Args) ->
                {"/eco/lookup/:resource_id", rest_handler, [eco, lookup]},
                {"/eco/delete/:resource_id", rest_handler, [eco, delete]},
                {"/eco/list/", rest_handler, [eco, list]},
+	       % EDR
+               {"/edr/create/", rest_handler, [edr, create]},
+               {"/edr/lookup/:resource_id", rest_handler, [edr, lookup]},
+               {"/edr/delete/:resource_id", rest_handler, [edr, delete]},
+               {"/edr/list/", rest_handler, [edr, list]},
 	       % EUICC
                {"/euicc/create/", rest_handler, [euicc, create]},
                {"/euicc/lookup/:resource_id", rest_handler, [euicc, lookup]},

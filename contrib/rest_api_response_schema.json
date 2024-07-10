@@ -323,6 +323,77 @@
 					 "badParam"]
 			    }
 			},{
+			    "euiccDataResult": {
+				"description": "contains the result of an ipaEuiccDataRequest request (see also GSMA SGP.32, section 2.11.1.2)",
+				"type": "object",
+				"properties" : {
+				    "edrResult": {
+					"description": "status code of the execution of the ipaEuiccDataRequest",
+					"type": "string",
+					"enum": ["ok",
+						 "incorrectTagList",
+						 "euiccCiPKIdNotFound",
+						 "undefinedError"]
+				    },
+				    "euiccData": {
+					"description": "contains the resulting eUICC data objects",
+					"type": "object",
+					"properties" : {
+					    "defaultSmdpAddress": {
+						"description": "see GSMA SGP.32",
+						"type": "string"
+					    },
+					    "euiccInfo1": {
+						"description": "ASN.1 encoded, see GSMA SGP.22",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "euiccInfo2": {
+						"description": "ASN.1 encoded, see GSMA SGP.22 and GSMA SGP.32",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "rootSmdsAddress": {
+						"description": "see GSMA SGP.32",
+						"type": "string"
+					    },
+					    "associationToken": {
+						"description": "see GSMA SGP.32",
+						"type": "integer"
+					    },
+					    "eumCertificate": {
+						"description": "ASN.1 encoded, see GSMA SGP.22",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "euiccCertificate": {
+						"description": "ASN.1 encoded, see GSMA SGP.22",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "ipaCapabilities": {
+						"description": "ASN.1 encoded, see GSMA SGP.32",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "deviceInfo": {
+						"description": "ASN.1 encoded, see GSMA SGP.32",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    },
+					    "notificationsList": {
+						"description": "ASN.1 encoded, see GSMA SGP.32",
+						"type": "string",
+						"pattern": "^[0-9,A-F]{2,32}$"
+					    }
+					}
+				    },
+				    "required": [
+					"edrResult"
+				    ]
+				}
+			    }
+			},{
 			    "procedureError": {
 				"description": "indicates a problem that lead to a termination of a procedure",
 				"type": "string",
@@ -336,6 +407,7 @@
 					 "euiccSignatureInvalid",
 					 "badPsmo",
 					 "badEco",
+					 "badEdr",
 					 "badOrder",
 					 "abortedOrder",
 					 "stuckOrder",

@@ -250,6 +250,15 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 				 #{euiccPackageSigned => EuiccPackageSigned,
 				   eimSignature => EimSignature}}
 			end;
+		    {edr, Order} ->
+			IpaEuiccDataRequest = esipa_rest_utils:edr_order_to_ipaEuiccDataRequest(Order),
+			case IpaEuiccDataRequest of
+			    error ->
+				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEdr}]}], EsipaReq),
+				{eimPackageError, undefinedError};
+			    _ ->
+				IpaEuiccDataRequest
+			end;
 		    none ->
 			{eimPackageError, noEimPackageAvailable};
 		    _ ->
@@ -267,8 +276,9 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
 	    % TODO: Do something useful with the notificationList, that is also included in this response
 	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
 	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
-	{ipaEuiccDataResponse, _} ->
-	    throw("TODO: Implement handling of incoming EuiccDataResponse");
+	{ipaEuiccDataResponse, IpaEuiccDataResponse} ->
+	    Outcome = esipa_rest_utils:ipaEuiccDataResponse_to_outcome(IpaEuiccDataResponse),
+	    mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
 	{profileDownloadTriggerResult, _} ->
 	    throw("TODO: Implement handling of incoming profileDownloadTriggerResult");
 	{eimPackageError, EimPackageError} ->

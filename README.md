@@ -162,6 +162,7 @@ URL. There are four facilities defined:
 * `download`: management of profile downloads
 * `psmo`: Profile State Management Operations (PSMO)
 * `eco`: Eim Configuration Operations (eCO)
+* `edr`: eUICC data request (see also GSMA SGP.32, section 2.11.1.2)
 * `euicc`: eim-local eUICC configuration Operations
 
 The purpose of the `facilities` is to provide separation at URL level. This allows for easier filtering to restrict

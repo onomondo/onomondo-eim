@@ -7,7 +7,9 @@
 	 euiccPackageResultDataSigned_to_outcome/1,
 	 profileInstallationResult_to_outcome/1,
 	 otherSignedNotification_to_outcome/1,
-	 cancelSessionResponse_to_outcome/1]).
+	 cancelSessionResponse_to_outcome/1,
+	 edr_order_to_ipaEuiccDataRequest/1,
+	 ipaEuiccDataResponse_to_outcome/1]).
 
 psmo_to_asn_enable(Psmo) ->
     case Psmo of
@@ -248,6 +250,20 @@ memberOrNilHex(Key, Map) ->
 	    nil
     end.
 
+memberOrNilAsnHex(Key, Map, AsnSpec, AsnType) ->
+    case maps:is_key(Key, Map) of
+	true ->
+	    Member = maps:get(Key, Map),
+	    {ok, MemberAsn1Encoded} = AsnSpec:encode(AsnType, Member),
+	    {Key, utils:binary_to_hex(MemberAsn1Encoded)};
+	_ ->
+	    nil
+    end.
+
+
+
+
+
 result_to_json_listProfileInfoResult(ListProfileInfoResult) ->
     ProfileInfo2Json = fun(ProfileInfo) ->
 			       List = [
@@ -392,4 +408,45 @@ cancelSessionResponse_to_outcome(CancelSessionResponse) ->
 	    [{[{cancelSessionResult, ok}]}];
 	_ ->
 	    [{[{cancelSessionResult, undefinedError}]}]
+    end.
+
+% Generate an ipaEuiccDataRequest from a eDR Order (JSON REST API)
+edr_order_to_ipaEuiccDataRequest(Order) ->
+    % TODO: also add support for the two optional parameters SubjectKeyIdentifier and searchCriteria
+    case Order of
+	{[{<<"edr">>,{[{<<"tagList">>, TagList}]}}]} ->
+	    {ipaEuiccDataRequest, #{tagList => utils:hex_to_binary(TagList)}};
+	_ ->
+	    error
+    end.
+
+% generate a JSON encodeable outcome (JSON REST API) from an ipaEuiccDataResponse
+ipaEuiccDataResponse_to_outcome(IpaEuiccDataResponse) ->
+    case IpaEuiccDataResponse of
+	{ipaEuiccData, IpaEuiccData} ->
+	    IpaEuiccDataJson = [
+				memberOrNil(defaultSmdpAddress, IpaEuiccData),
+				memberOrNilAsnHex(euiccInfo1, IpaEuiccData,
+						  'RSPDefinitions', 'EUICCInfo1'),
+				memberOrNilAsnHex(euiccInfo2, IpaEuiccData,
+						  'SGP32Definitions', 'SGP32-EUICCInfo2'),
+				memberOrNil(rootSmdsAddress, IpaEuiccData),
+				memberOrNil(associationToken, IpaEuiccData),
+				memberOrNilAsnHex(eumCertificate, IpaEuiccData,
+						  'PKIX1Explicit88', 'Certificate'),
+				memberOrNilAsnHex(euiccCertificate, IpaEuiccData,
+						  'PKIX1Explicit88', 'Certificate'),
+				memberOrNilAsnHex(ipaCapabilities, IpaEuiccData,
+						  'SGP32Definitions', 'IpaCapabilities'),
+				memberOrNilAsnHex(deviceInfo, IpaEuiccData,
+						  'RSPDefinitions', 'DeviceInfo'),
+				memberOrNilAsnHex(notificationsList, IpaEuiccData,
+						  'SGP32Definitions', 'SGP32-RetrieveNotificationsListResponse')
+			       ],
+	    IpaEuiccDataJsonFiltered = {lists:filter(fun(Member) -> Member /= nil end, IpaEuiccDataJson)},
+	    [{[{euiccDataResult, {[{edrResult, ok}, {euiccData, IpaEuiccDataJsonFiltered}]}}]}];
+	{ipaEuiccDataError, IpaEuiccDataError} ->
+	    [{[{euiccDataResult, {[{edrResult, IpaEuiccDataError}]}}]}];
+	_ ->
+	    [{[{euiccDataResult, {[{edrResult, undefinedError}]}}]}]
     end.
