@@ -115,6 +115,7 @@ cases, those parameters do not have to be modified.
 * `rest_timeout_stuck`: Configure timeout until an order/procedure (e.g. profile download) must finish.
 * `rest_timeout_noshow`: Configure timeout until an order/procedure must start.
 * `rest_timeout_expired`: Configure timeout until the REST API user must lookup/delete the order via the REST API
+* `root_ci_cert`: Root certificate of the eUICC CI (to verify EUM and eUICC certificate)
 
 #### Timeout Behavior
 
@@ -525,3 +526,9 @@ Example: displaying the contents of the `euicc` table on the erlang shell
         <<>>,<<"prime256v1">>}]
 (onomondo_eim@127.0.0.1)3>
 ```
+
+#### eUICC public key
+
+The eUICC public key information (`signPubKey` and `signAlgo`) can be set via the `euicc` facility of the REST API.
+However, it is not necessary to do so. In case no `signPubKey` is set, onomondo-eim will automatically learn the
+the public key information from the eUICC certificate that is exchanged during the profile download.
