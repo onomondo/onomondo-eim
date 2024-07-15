@@ -412,11 +412,11 @@ work_finish(Pid, Outcome, Debuginfo) ->
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("Work: finishing work item: Pid=~p, Outcome=~p, Debuginfo=~p", [Pid, Outcome, Debuginfo]),
+	    logger:notice("Work: finishing work item: Pid=~p, Outcome=~p", [Pid, Outcome]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p, Debuginfo=~p",
-			 [Pid, Outcome, Debuginfo]),
+	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p",
+			 [Pid, Outcome]),
 	    error
 	end.
 
