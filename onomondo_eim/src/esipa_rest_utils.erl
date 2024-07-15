@@ -6,7 +6,6 @@
 	 eco_order_to_euiccPackageSigned/3,
 	 euiccPackageResultDataSigned_to_outcome/1,
 	 profileInstallationResult_to_outcome/1,
-	 otherSignedNotification_to_outcome/1,
 	 cancelSessionResponse_to_outcome/1,
 	 edr_order_to_ipaEuiccDataRequest/1,
 	 ipaEuiccDataResponse_to_outcome/1]).
@@ -395,11 +394,6 @@ profileInstallationResult_to_outcome(ProfileInstallationResult) ->
 		{[{finalResult, errorResult}]}
 	       }]}]
     end.
-
-% generate a JSON encodeable outcome (JSON REST API) from an OtherSignedNotification
-otherSignedNotification_to_outcome(_OtherSignedNotification) ->
-    % TODO: extract some useful information from OtherSignedNotification
-    [{[{notificationResult, otherSignedNotification}]}].
 
 % generate a JSON encodeable outcome (JSON REST API) from an CancelSessionResponse
 cancelSessionResponse_to_outcome(CancelSessionResponse) ->

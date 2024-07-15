@@ -154,39 +154,51 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
     case EsipaReq of
 	{pendingNotification, PendingNotif} ->
-	    Rc = case PendingNotif of
-		     {profileInstallationResult, PrfleInstRslt} ->
-			 PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
-			 TransactionId = maps:get(transactionId, PrfleInstRsltData),
-			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
-			 Oc = esipa_rest_utils:profileInstallationResult_to_outcome(PrfleInstRslt),
-			 Eq = {handleNotification,
-			       #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}},
-			 {Ws, Oc, Eq};
-		     {otherSignedNotification, OtherSignNotif} ->
-			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
-			 Oc = esipa_rest_utils:otherSignedNotification_to_outcome(OtherSignNotif),
-			 Eq = {handleNotification,
-			       #{pendingNotification => {otherSignedNotification, OtherSignNotif}}},
-			 {Ws, Oc, Eq};
-		     {compactProfileInstallationResult, _CompactPrfleInstRslt} ->
-		         % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
-		         throw("unsuppported message type \"compactProfileInstallationResult\"");
-		     {compactOtherSignedNotification, _CompactOtherSignNotif} ->
-			 % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
-			 throw("unsuppported message type \"compactOtherSignedNotification\"")
-		     end,
-	    {WorkState, Outcome, Es9Req} = Rc,
+	    case PendingNotif of
+		{profileInstallationResult, PrfleInstRslt} ->
+		    PrfleInstRsltData = maps:get(profileInstallationResultData, PrfleInstRslt),
+		    TransactionId = maps:get(transactionId, PrfleInstRsltData),
+		    NotificationMetadata = maps:get(notificationMetadata, PrfleInstRsltData),
+		    BaseUrl = maps:get(notificationAddress, NotificationMetadata),
+		    Es9Req = {handleNotification, #{pendingNotification => {profileInstallationResult, PrfleInstRslt}}},
 
-            % perform ES9+ request (We expect an empty response in this case)
-	    BaseUrl = maps:get(smdpAddress, WorkState),
-	    case es9p_client:request_json(Es9Req, BaseUrl) of
-		{} ->
-		    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
-		_ ->
-		    ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, handleNotificationError}]}], EsipaReq)
+		    % Under normal circumstances, the ProfileInstallationResult is sent as the last message of the
+		    % Sub-procedure Profile Installation (see also GSMA SGP.22, section 3.1.3.3). The eIM uses the
+		    % result data contained in this message to conclude the download and to make the download results
+		    % available to the REST API user. However, in rare cases it is possible that a
+		    % ProfileInstallationResult is received way too late as part of the Notification Delivery to
+		    % Notification Receivers (see also GSMA SGP.32, section 3.7) procedure. By then the context in the
+		    % eIM may be long gone. The eIM will be unable to match the ProfileInstallationResult to any
+		    % context but it will foward it to the SMDP+ anyway.
+		    case mnesia_db:work_bind(maps:get(pid, Req0), TransactionId) of
+			ok ->
+			    % A work item exists, foward the ProfileInstallationResult and make its contents
+			    % available to the REST API user
+			    case es9p_client:request_json(Es9Req, BaseUrl) of
+				{} ->
+				    Outcome = esipa_rest_utils:profileInstallationResult_to_outcome(PrfleInstRslt),
+				    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
+				_ ->
+				    ok = mnesia_db:work_finish(maps:get(pid, Req0),
+							       [{[{procedureError, handleNotificationError}]}],
+							       EsipaReq)
+			    end;
+			_ ->
+			    % No work item exists, foward the ProfileInstallationResult
+			    {} = es9p_client:request_json(Es9Req, BaseUrl)
+		    end;
+		{otherSignedNotification, OtherSignNotif} ->
+		    Es9Req = {handleNotification, #{pendingNotification => {otherSignedNotification, OtherSignNotif}}},
+		    TbsOtherNotification = maps:get(tbsOtherNotification, OtherSignNotif),
+		    BaseUrl = maps:get(notificationAddress, TbsOtherNotification),
+		    {} = es9p_client:request_json(Es9Req, BaseUrl);
+		{compactProfileInstallationResult, _CompactPrfleInstRslt} ->
+		    % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+		    throw("unsuppported message type \"compactProfileInstallationResult\"");
+		{compactOtherSignedNotification, _CompactOtherSignNotif} ->
+		    % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+		    throw("unsuppported message type \"compactOtherSignedNotification\"")
 	    end;
-
 	{provideEimPackageResult, _PrvdeEimPkgRslt} ->
 	    %Use the already existing handle_asn1 function to prcess the provideEimPackageResult we got here
 	    %(provideEimPackageResult is directed to the eIM itsself, so there will be no ES9+ request)
