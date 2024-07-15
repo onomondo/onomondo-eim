@@ -405,6 +405,7 @@
 					 "cancelSessionResponseError",
 					 "handleNotificationError",
 					 "euiccSignatureInvalid",
+					 "undefinedError",
 					 "badPsmo",
 					 "badEco",
 					 "badEdr",

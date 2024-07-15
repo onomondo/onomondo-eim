@@ -4,7 +4,7 @@
 -module(esipa_asn1_handler).
 -behavior(cowboy_handler).
 
--export([init/2]).
+-export([init/2, terminate/3]).
 
 -define(RESPONSE_HEADERS, #{<<"content-type">> => <<"application/x-gsma-rsp-asn1">>,
 			    <<"x-admin-protocol">> => <<"gsma/rsp/v2.1.0">>}).
@@ -316,8 +316,7 @@ encode_eim_to_ipa(emptyResponse) ->
 encode_eim_to_ipa(EimToIpa) ->
     'SGP32Definitions':encode('EsipaMessageFromEimToIpa', EimToIpa).
 
-% Start HTTP server
-% TODO: maybe it makes sense to put this in a different module?
+% Process HTTP request
 init(Req0, State) ->
     Req = case cowboy_req:header(<<"content-type">>, Req0) of
 	      <<"application/x-gsma-rsp-asn1">> ->
@@ -333,3 +332,15 @@ init(Req0, State) ->
 		  cowboy_req:reply(415, ?RESPONSE_HEADERS, <<"Unsupported content-type">>, Req0)
 	  end,
     {ok, Req, State}.
+
+% Handle termination of HTTP requests
+terminate(Reason, Req0, _State) ->
+    case Reason of
+        normal ->
+	    logger:notice("ASN.1 handler terminated, Reason=~p", [Reason]),
+	    ok;
+	_ ->
+	    mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, undefinedError}]}], Reason),
+	    logger:error("ASN.1 handler terminated unexpectetly, Reason=~p", [Reason]),
+	    cowboy_req:reply(500, ?RESPONSE_HEADERS, <<"Internal Server Error">>, Req0)
+    end.
