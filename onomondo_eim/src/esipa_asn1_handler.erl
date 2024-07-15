@@ -62,7 +62,8 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseError, AuthRespErr}}};
 		 {compactAuthenticateResponseOk, _compartAuthRespOk} ->
-		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
+		     % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+		     throw("unsuppported message type \"compactAuthenticateResponseOk\"")
 	     end,
 
     % perform ES9+ request
@@ -97,7 +98,8 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			prepareDownloadResponse => {downloadResponseError, DwnldRespErr}}};
 		 {compactDownloadResponseOk, _CompactAuthRespOk} ->
-		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
+		     % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+		     throw("unsuppported message type \"compactDownloadResponseOk\"")
 	     end,
 
     % perform ES9+ request
@@ -133,7 +135,8 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			cancelSessionResponse => {cancelSessionResponseError, CancelSessionRespErr}}};
 		 {compactCancelSessionResponseOk, _CompactCancelSessionReq} ->
-		     throw("IPA Capability \"minimizeEsipaBytes\" (optional) not supported by this eIM")
+		     % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
+		     throw("unsuppported message type \"compactCancelSessionResponseOk\"")
 	     end,
 
     % perform ES9+ request
@@ -168,16 +171,10 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 			 {Ws, Oc, Eq};
 		     {compactProfileInstallationResult, _CompactPrfleInstRslt} ->
 		         % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
-			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
-			 Oc = [{[{procedureError, handleNotificationError}]}],
-			 Eq = {}, % Not supported
-			 {Ws, Oc, Eq};
+		         throw("unsuppported message type \"compactProfileInstallationResult\"");
 		     {compactOtherSignedNotification, _CompactOtherSignNotif} ->
 			 % IPA Capability "minimizeEsipaBytes" (optional) is not supported by this eIM
-			 {_, _, Ws} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
-			 Oc = [{[{procedureError, handleNotificationError}]}],
-			 Eq = {}, % Not supported
-			 {Ws, Oc, Eq}
+			 throw("unsuppported message type \"compactOtherSignedNotification\"")
 		     end,
 	    {WorkState, Outcome, Es9Req} = Rc,
 
