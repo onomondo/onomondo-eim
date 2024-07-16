@@ -37,12 +37,14 @@ make_req_json(BaseUrl, Function, JsonBody) ->
     % TODO: actually verify the certificate by providing custom root CA Cert
     SslOptions = [ {verify, verify_none} ],
     Options = [ {ssl_options, SslOptions}, with_body ],
-    logger:notice("Tx ES9+ JSON:~nURL=~p~nReqHeaders:~p~nReqBody=~p", [URL, ReqHeaders, ReqBody]),
+    logger:debug("Tx ES9+ JSON,~nURL=~p,~nReqHeaders=~p,~nReqBody=~p~n",
+		 [URL, ReqHeaders, ReqBody]),
 
     % Perform request
     case hackney:request(Method, URL, ReqHeaders, ReqBody, Options) of
 	{ok, StatusCode, RespHeaders, RespBody} ->
-	    logger:notice("Rx ES9+ JSON:~nStatusCode=~p~nRespHeaders=~p~nRespBody=~p", [StatusCode, RespHeaders, RespBody]),
+	    logger:debug("Rx ES9+ JSON,~nURL=~p,~nStatusCode=~p,~nRespHeaders=~p,~nRespBody=~p~n",
+			 [URL, StatusCode, RespHeaders, RespBody]),
 	    % TODO: verify RespHeaders: X-Admin-Protocol
 	    % TODO: verify RespHeaders: Content-Type
 	    RespBodyDecoded = case StatusCode of
@@ -51,7 +53,7 @@ make_req_json(BaseUrl, Function, JsonBody) ->
 			      end,
 	    {ok, StatusCode, RespBodyDecoded};
 	_ ->
-	    logger:notice("ES9+ request to ~s failed", [URL]),
+	    logger:error("ES9+ request to ~s failed~n", [URL]),
 	    {ok, 503, ""}
     end.
 
@@ -68,13 +70,15 @@ make_req_asn1(BaseUrl, Asn1Body) ->
     % TODO: actually verify the certificate by providing custom root CA Cert
     SslOptions = [ {verify, verify_none} ],
     Options = [ {ssl_options, SslOptions}, with_body ],
-    logger:notice("Tx ES9+ ASN.1:~nURL=~p~nReqHeaders=~p~nReqBody=~p", [URL, ReqHeaders, ReqBody]),
+    logger:debug("Tx ES9+ ASN.1,~nURL=~p,~nReqHeaders=~p,~nReqBody=~p~n",
+		 [URL, ReqHeaders, ReqBody]),
     {ok, StatusCode, RespHeaders, RespBody} = hackney:request(Method, URL, ReqHeaders, ReqBody, Options),
 
     % Perform request
     case hackney:request(Method, URL, ReqHeaders, ReqBody, Options) of
 	{ok, StatusCode, RespHeaders, RespBody} ->
-	    logger:notice("Rx ES9+ ASN.1:~nStatusCode=~p~nRespHeaders=~p~nRespBody=~p", [StatusCode, RespHeaders, RespBody]),
+	    logger:debug("Rx ES9+ ASN.1,~nURL=~p,~nStatusCode=~p,~nRespHeaders=~p,~nRespBody=~p~n",
+			 [URL, StatusCode, RespHeaders, RespBody]),
 	    % TODO: verify RespHeaders: X-Admin-Protocol
 	    % TODO: verify RespHeaders: Content-Type
 	    RespBodyDecoded = case StatusCode of
@@ -84,7 +88,7 @@ make_req_asn1(BaseUrl, Asn1Body) ->
 			      end,
 	    {ok, StatusCode, RespBodyDecoded};
 	_ ->
-	    logger:notice("ES9+ request to ~s failed", [URL]),
+	    logger:error("ES9+ request to ~s failed~n", [URL]),
 	    {ok, 503, ""}
     end.
 

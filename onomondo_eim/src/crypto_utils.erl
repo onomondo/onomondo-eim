@@ -63,7 +63,7 @@ verify_signature(Message, Signature, EidValue) ->
 		     <<"brainpoolP256r1">> ->
 			 {1,3,36,3,3,2,8,1,1,7};
 		     _ ->
-			 logger:error("invalid SignAlgo configured for eID ~p", [utils:binary_to_hex(EidValue)]),
+			 logger:error("invalid SignAlgo configured for eID: ~p~n", [utils:binary_to_hex(EidValue)]),
 			 {}
 		 end,
 
@@ -79,7 +79,7 @@ verify_signature(Message, Signature, EidValue) ->
 			     "NamedCurve=~p~n" ++
 			     "Signature=~p~n" ++
 			     "DERSignature=~p~n" ++
-			     "Message=~p", [utils:binary_to_hex(EidValue),
+			     "Message=~p~n", [utils:binary_to_hex(EidValue),
 					      utils:binary_to_hex(SubjectPublicKey),
 					      NamedCurve,
 					      utils:binary_to_hex(Signature),
@@ -168,8 +168,8 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
 		    error
 	    end;
 	_ ->
-	    logger:notice("omitting signature check for euiccPackageResultSigned from eID ~p (consumer eUICC)",
-			  [utils:binary_to_hex(EidValue)]),
+	    logger:info("omitting signature check for euiccPackageResultSigned from eID ~p (consumer eUICC)~n",
+			[utils:binary_to_hex(EidValue)]),
 	    ok
     end.
 
@@ -200,7 +200,7 @@ verify_cert(TrustedCert, VerifyCert) ->
 	true ->
 	    ok;
 	_ ->
-	    logger:error("Certificate verification failed:~nCert:~p~nECPublicKey:~p", [VerifyCert, ECPublicKey]),
+	    logger:error("Certificate verification failed,~nVerifyCert=~p,~nECPublicKey=~p~n", [VerifyCert, ECPublicKey]),
 	    error
     end.
 

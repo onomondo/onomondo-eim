@@ -56,7 +56,8 @@ handle_get_request(Req, #state{op=Op} = State) ->
 % Create a new resource and return its identifier
 post_rest_create(Req, State, Facility) ->
     {ok, [{Content, true}], Req1} = cowboy_req:read_urlencoded_body(Req),
-    logger:notice("REST: creating new REST resource: Resource=~p, Facility=~p", [Content, Facility]),
+    logger:info("REST: creating new REST resource,~nPeer=~p, Resource=~p, Facility=~p",
+		[maps:get(peer, Req), Content, Facility]),
     ContentDecoded = jiffy:decode(Content),
     {[{<<"eidValue">>, EidValue}, _]} = ContentDecoded,
     {[_, {<<"order">>, Order}]} = ContentDecoded,
@@ -64,7 +65,8 @@ post_rest_create(Req, State, Facility) ->
     case cowboy_req:method(Req1) of
         <<"POST">> ->
             Response = io_lib:format("/~s/lookup/~s", [Facility, ResourceId]),
-	    logger:notice("REST: responding to client: ResourceId=~p, Response:~p", [ResourceId, list_to_binary(Response)]),
+	    logger:info("REST: responding to client,~nPeer=~p, ResourceId=~p, Response:~p~n",
+			[maps:get(peer, Req), ResourceId, list_to_binary(Response)]),
             {{true, list_to_binary(Response)}, Req1, State};
         _ ->
             {true, Req1, State}
@@ -73,7 +75,8 @@ post_rest_create(Req, State, Facility) ->
 % Lookup a specific resource and output it to the requestor
 get_rest_lookup(Req, State, Facility) ->
     ResourceId = binary_to_list((cowboy_req:binding(resource_id, Req))),
-    logger:notice("REST: client requests REST resource for lookup: ResourceId=~p, Facility=~p", [ResourceId, Facility]),
+    logger:info("REST: client requests REST resource for lookup,~nPeer=~p, ResourceId=~p, Facility=~p~n",
+		[maps:get(peer, Req), ResourceId, Facility]),
     Result = mnesia_db:rest_lookup(ResourceId, Facility),
     Response = case Result of
 		   {Status, Timestamp, EidValue, Order, Outcome, Debuginfo} ->
@@ -89,13 +92,15 @@ get_rest_lookup(Req, State, Facility) ->
 		       {[{status, error}]}
 	       end,
     ResponseJson = jiffy:encode(Response),
-    logger:notice("REST: responding to client: ResourceId=~p, Response:~p", [ResourceId, ResponseJson]),
+    logger:info("REST: responding to client,~nPeer=~p, ResourceId=~p, Response:~p~n",
+		[maps:get(peer, Req), ResourceId, ResponseJson]),
     {ResponseJson, Req, State}.
 
 % Delete a specific resource
 get_rest_delete(Req, State, Facility) ->
     ResourceId = binary_to_list((cowboy_req:binding(resource_id, Req))),
-    logger:notice("REST: client requests REST resource for delete: ResourceId=~p, Facility=~p", [ResourceId, Facility]),
+    logger:info("REST: client requests REST resource for delete,~nPeer=~p, ResourceId=~p, Facility=~p~n",
+		[maps:get(peer, Req), ResourceId, Facility]),
     Result = mnesia_db:rest_delete(ResourceId, Facility),
     Response = case Result of
 		   ok ->
@@ -106,22 +111,25 @@ get_rest_delete(Req, State, Facility) ->
 		       {[{status, error}]}
 	       end,
     ResponseJson = jiffy:encode(Response),
-    logger:notice("REST: responding to client: ResourceId=~p, Response:~p", [ResourceId, ResponseJson]),
+    logger:info("REST: responding to client,~nPeer=~p, ResourceId=~p, Response:~p~n",
+		[maps:get(peer, Req), ResourceId, ResponseJson]),
     {ResponseJson, Req, State}.
 
 % Output a list of all pending resources to the requestor
 get_rest_list(Req, State, Facility) ->
-    logger:notice("REST: client requests REST resource list: Facility=~p", [Facility]),
+    logger:info("REST: client requests REST resource list,~nPeer=~p, Facility=~p~n",
+		[maps:get(peer, Req), Facility]),
     Result = mnesia_db:rest_list(Facility),
     ResourceIdList = [ list_to_binary(X) || X <- Result],
     Response = io_lib:format("{\"resourceIdList\": ~s}",
 			     [binary_to_list(jiffy:encode(ResourceIdList))]),
-    logger:notice("REST: responding to client: Response:~p", [list_to_binary(Response)]),
+    logger:info("REST: responding to client,~nPeer=~p, Response:~p",
+		[maps:get(peer, Req), list_to_binary(Response)]),
     {list_to_binary(Response), Req, State}.
 
 % Output a list with basic information about the eIM instance to the requestor
 get_rest_info(Req, State) ->
-    logger:notice("REST: client requests info~n"),
+    logger:info("REST: client requests info,~nPeer=~p~n", [maps:get(peer, Req)]),
     {ok, EimId} = application:get_env(onomondo_eim, eim_id),
     {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
     {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
@@ -147,5 +155,6 @@ get_rest_info(Req, State) ->
 		]},
     InfoListJson = utils:join_binary_list(jiffy:encode(InfoList)),
     Response = io_lib:format("~s", [binary_to_list(InfoListJson)]),
-    logger:notice("REST: responding to client: Response:~p", [list_to_binary(Response)]),
+    logger:info("REST: responding to client,~nPeer=~p, Response=~p~n",
+		[maps:get(peer, Req), list_to_binary(Response)]),
     {list_to_binary(Response), Req, State}.

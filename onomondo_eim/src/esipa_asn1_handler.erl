@@ -332,9 +332,14 @@ init(Req0, State) ->
 		  % do the asn1 decode of the request body; dispatch to real handler
 		  {ok, Data, Req1} = cowboy_req:read_body(Req0),
 		  {ok, IpaToEim} = 'SGP32Definitions':decode('EsipaMessageFromIpaToEim', Data),
-		  logger:notice("Rx ESipa ASN.1: ~p", [IpaToEim]),
+		  {EsipaMsgType, _} = IpaToEim,
+		  logger:info("Handling incoming IPAd request: ~p,~nPeer=~p, Pid=~p~n",
+			      [EsipaMsgType, maps:get(peer, Req0), maps:get(pid, Req0)]),
+		  logger:debug("Rx ESipa ASN.1,~nPeer=~p, Pid=~p,~nIpaToEim=~p~n",
+			       [maps:get(peer, Req0), maps:get(pid, Req0), IpaToEim]),
 		  EimToIpa = handle_asn1(Req1, State, IpaToEim),
-		  logger:notice("Tx ESipa ASN.1: ~p", [EimToIpa]),
+		  logger:debug("Tx ESipa ASN.1,~nPeer=~p,Pid=~p,~nEimToIpa=~p~n",
+			       [maps:get(peer, Req0), maps:get(pid, Req0), EimToIpa]),
 		  {ok, EncodedRespBody} = encode_eim_to_ipa(EimToIpa),
 		  cowboy_req:reply(200, ?RESPONSE_HEADERS, EncodedRespBody, Req0);
 	      _ ->
@@ -346,10 +351,9 @@ init(Req0, State) ->
 terminate(Reason, Req0, _State) ->
     case Reason of
         normal ->
-	    logger:notice("ASN.1 handler terminated, Reason=~p", [Reason]),
 	    ok;
 	_ ->
 	    mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, undefinedError}]}], Reason),
-	    logger:error("ASN.1 handler terminated unexpectetly, Reason=~p", [Reason]),
+	    logger:info("Handling of IPAd request terminated unexpectetly, Reason=~p Pid=~p~n", [Reason, maps:get(pid, Req0)]),
 	    cowboy_req:reply(500, ?RESPONSE_HEADERS, <<"Internal Server Error">>, Req0)
     end.

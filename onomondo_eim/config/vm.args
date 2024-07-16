@@ -2,3 +2,4 @@
 -setcookie onomondo_eim
 -mnesia dir '"./db"'
 -heart
+-kernel logger_level notice

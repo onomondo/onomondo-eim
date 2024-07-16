@@ -56,10 +56,10 @@ init() ->
 	{error, {_, {already_exists, _}}} ->
 	    ok;
 	ok ->
-	    logger:notice("    mnesia database schema created")
+	    logger:notice("    mnesia database schema created~n")
     end,
     ok = mnesia:start(),
-    logger:notice("    mnesia started"),
+    logger:notice("    mnesia started~n"),
 
     % The rest table is a persistent table, so even after a crash it will be possible to continue pending orders.
     case mnesia:create_table(rest,
@@ -70,7 +70,7 @@ init() ->
 	{aborted, {already_exists, rest}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    rest table created")
+	    logger:notice("    rest table created~n")
     end,
 
     % The work table is volatile. It only contains intermediate results. When the eIM is restarted and there is a
@@ -83,7 +83,7 @@ init() ->
 	{aborted, {already_exists, work}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    work table created")
+	    logger:notice("    work table created~n")
     end,
 
     % The euicc table will store the eUICC master data, such as the eID and the counterValue that is required for
@@ -96,13 +96,13 @@ init() ->
 	{aborted, {already_exists, euicc}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    euicc table created")
+	    logger:notice("    euicc table created~n")
     end,
 
     % Wait until the mnesia tables become available.
     case mnesia:wait_for_tables([rest, work], 60000) of
 	{timeout, _} ->
-	    logger:error("    unable to synchronize mnesia tables"),
+	    logger:error("    unable to synchronize mnesia tables~n"),
 	    throw("normal operation not possible");
 	ok ->
 	    ok
@@ -262,14 +262,14 @@ work_fetch(EidValue, Pid) ->
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
 	{rest, _, Facility, _, Order, _, _, _, _} ->
-	    logger:notice("Work: fetching new work item: EidValue=~p, Pid=~p, Order=~p, Facility=~p",
-			  [EidValue, Pid, Order, Facility]),
+	    logger:info("Work: fetching new work item,~nEidValue=~p, Pid=~p, Facility=~p,~nOrder=~p~n",
+			  [EidValue, Pid, Facility, Order]),
 	    {Facility, Order};
 	none ->
-	    logger:notice("Work: no work item in database: EidValue=~p, Pid=~p", [EidValue, Pid]),
+	    logger:info("Work: no work item in database,~nEidValue=~p, Pid=~p~n", [EidValue, Pid]),
 	    none;
 	_ ->
-	    logger:error("Work: cannot fetch work item, database error: EidValue=~p, Pid=~p", [EidValue, Pid]),
+	    logger:error("Work: cannot fetch work item, database error,~nEidValue=~p, Pid=~p~n", [EidValue, Pid]),
 	    error
 	end.
 
@@ -313,26 +313,25 @@ work_bind(Pid, TransactionId) ->
     {atomic, Result} = mnesia:transaction(TransUpdateTrnsId),
     case Result of
         ok ->
-	    logger:notice("Work: bound work item to transactionId: Pid=~p, TransactionId=~p", [Pid, TransactionId]),
+	    logger:info("Work: bound work item to transactionId,~nPid=~p, TransactionId=~p~n", [Pid, TransactionId]),
 	    ok;
 	none ->
 	    {atomic, UpdatePidResult} = mnesia:transaction(TransUpdatePid),
 	    case UpdatePidResult of
 		ok ->
-		    logger:notice("Work: bound work item to PID: Pid=~p, TransactionId=~p", [Pid, TransactionId]),
-
+		    logger:info("Work: bound work item to PID,~nPid=~p, TransactionId=~p~n", [Pid, TransactionId]),
 		    ok;
 		none ->
-		    logger:error("Work: cannot bind work item, transactionId nor PID found: Pid=~p, TransactionId=~p",
+		    logger:error("Work: cannot bind work item, transactionId nor PID found,~nPid=~p, TransactionId=~p~n",
 				 [Pid, TransactionId]),
 		    error;
 		_ ->
-		    logger:error("Work: cannot bind work item, database error: Pid=~p, TransactionId=~p, TransUpdatePid",
+		    logger:error("Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdatePid~n",
 				 [Pid, TransactionId]),
 		    error
 	    end;
 	_ ->
-	    logger:error("Work: cannot bind work item, database error: Pid=~p, TransactionId=~p, TransUpdateTrnsId",
+	    logger:error("Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdateTrnsId~n",
 			 [Pid, TransactionId]),
 	    error
     end.
@@ -359,11 +358,11 @@ work_pickup(Pid, TransactionId) ->
 	[{EidValue, Order, State} | _] ->
 	    {EidValue, Order, State};
 	[] ->
-	    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?: Pid=~p",
+	    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?,~nPid=~p~n",
 			 [Pid]),
 	    none;
 	_ ->
-	    logger:error("Work: cannot pick up work item, database error: Pid=~p", [Pid]),
+	    logger:error("Work: cannot pick up work item, database error,~nPid=~p~n", [Pid]),
 	    error
     end.
 
@@ -386,10 +385,10 @@ work_update(Pid, State) ->
     {atomic , Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("Work: updating work item: Pid=~p, State=~p", [Pid, State]),
+	    logger:info("Work: updating work item,~nPid=~p, State=~p~n", [Pid, State]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot update, database error: Pid=~p, State=~p", [Pid, State]),
+	    logger:error("Work: cannot update, database error,~nPid=~p, State=~p~n", [Pid, State]),
 	    error
     end.
 
@@ -412,10 +411,10 @@ work_finish(Pid, Outcome, Debuginfo) ->
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("Work: finishing work item: Pid=~p, Outcome=~p", [Pid, Outcome]),
+	    logger:info("Work: finishing work item,~nPid=~p, Outcome=~p~n", [Pid, Outcome]),
 	    ok;
 	_ ->
-	    logger:error("Work: cannot finish work item, database error: Pid=~p, Outcome=~p",
+	    logger:error("Work: cannot finish work item, database error,~nPid=~p, Outcome=~p~n",
 			 [Pid, Outcome]),
 	    error
 	end.
@@ -445,12 +444,12 @@ euicc_create_if_not_exist(EidValue) ->
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("eUICC: creating new master data entry: eID=~p", [EidValue]),
+	    logger:info("eUICC: creating new master data entry,~neID=~p~n", [EidValue]),
 	    ok;
 	present ->
 	    ok;
 	_ ->
-	    logger:error("eUICC: cannot create master data entry, database error: eID=~p", [EidValue]),
+	    logger:error("eUICC: cannot create master data entry, database error,~neID=~p~n", [EidValue]),
 	    error
 	end.
 
@@ -474,10 +473,10 @@ euicc_counter_tick(EidValue) ->
     {atomic , Result} = mnesia:transaction(Trans),
     case Result of
         {ok, CounterValue} ->
-	    logger:notice("eUICC: incrementing counterValue: eID=~p, counter=~p", [EidValue, CounterValue]),
+	    logger:info("eUICC: incrementing counterValue,~neID=~p, counter=~p~n", [EidValue, CounterValue]),
 	    {ok, CounterValue};
 	_ ->
-	    logger:error("eUICC: cannot increment counterValue, database error: eID=~p", [EidValue]),
+	    logger:error("eUICC: cannot increment counterValue, database error,~neID=~p~n", [EidValue]),
 	    error
     end.
 
@@ -538,10 +537,10 @@ euicc_param_get(EidValue, Name) ->
     {atomic , Result} = mnesia:transaction(Trans),
     case Result of
         {ok, Value} ->
-	    logger:notice("eUICC: reading eUICC parameter: eID=~p, name=~p, value=~p", [EidValue, Name, Value]),
+	    logger:info("eUICC: reading eUICC parameter,~neID=~p, name=~p, value=~p~n", [EidValue, Name, Value]),
 	    {ok, Value};
 	_ ->
-	    logger:error("eUICC: cannot read eUICC parameter: eID=~p, name=~p", [EidValue, Name]),
+	    logger:error("eUICC: cannot read eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
 	    error
     end.
 
@@ -553,10 +552,10 @@ euicc_param_set(EidValue, Name, Value) ->
     {atomic , Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:notice("eUICC: writing eUICC parameter: eID=~p, name=~p, value=~p", [EidValue, Name, Value]),
+	    logger:info("eUICC: writing eUICC parameter,~neID=~p, name=~p, value=~p~n", [EidValue, Name, Value]),
 	    ok;
 	_ ->
-	    logger:error("eUICC: cannot write eUICC parameter: eID=~p, name=~p", [EidValue, Name]),
+	    logger:error("eUICC: cannot write eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
 	    error
     end.
 
@@ -675,7 +674,7 @@ cleanup() ->
         {ok,ok,ok} ->
 	    ok;
 	_ ->
-	    logger:error("Cleanup: database error"),
+	    logger:error("Cleanup: database error~n"),
 	    error
     end,
 
@@ -737,7 +736,7 @@ euicc_setparam() ->
         ok ->
 	    ok;
 	_ ->
-	    logger:error("eUICC: euicc procedure failed, database error"),
+	    logger:error("eUICC: euicc procedure failed, database error~n"),
 	    error
     end,
 

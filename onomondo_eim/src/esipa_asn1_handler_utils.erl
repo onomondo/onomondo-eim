@@ -34,7 +34,7 @@ process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId) ->
 				    CounterValueEim ->
 					ok;
 				    _ ->
-					logger:error("invalid euiccPackageResultSigned, counterValue mismatch: CounterValueIpad=~p, CounterValueEim=~p",
+					logger:error("invalid euiccPackageResultSigned, counterValue mismatch: CounterValueIpad=~p, CounterValueEim=~p~n",
 						     [CounterValueIpad, CounterValueEim]),
 					error
 				end
