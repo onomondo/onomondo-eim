@@ -36,6 +36,13 @@
 	    "description": "eIM certificate (used for creating signatures)",
 	    "type": "string"
 	},
+	"rootCiCerts": {
+	    "description": "List of configured eUICC root CI certificates",
+	    "type": "array",
+	    "items": {
+		"type": "string"
+	    }
+	},
 	"addInitialEimRequest": {
 	    "description": "ASN.1 encoded eIM configuration (see also GSMA SGP.32)",
 	    "type": "string",

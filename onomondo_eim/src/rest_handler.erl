@@ -140,6 +140,13 @@ get_rest_info(Req, State) ->
     {ok, EimCertPath} = application:get_env(onomondo_eim, eim_cert),
     {ok, EimCertPem} = file:read_file(EimCertPath),
     {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
+    FormatRootCiCert = fun(RootCiCertPath) ->
+			       {ok, RootCiCertPem} = file:read_file(RootCiCertPath),
+			       RootCiCertPem
+		       end,
+    {ok, RootCiCerts} = application:get_env(onomondo_eim, root_ci_certs),
+    RootCiCertsJson = [FormatRootCiCert(RootCiCertPath) || RootCiCertPath <- RootCiCerts],
+
     InfoList = {[
 		  {hostname, list_to_binary(Hostname)},
 		  {node, node()},
@@ -149,6 +156,7 @@ get_rest_info(Req, State) ->
 		  {esipaPort, EsipaPort},
 		  {esipaSslCert, EsipaSslCertPem},
 		  {eimCert, EimCertPem},
+		  {rootCiCerts, RootCiCertsJson},
 		  {addInitialEimRequest, eim_cfg:gen_eim_configuration_data(request)},
 		  {eimConfigurationData, eim_cfg:gen_eim_configuration_data(single)},
 		  {counterValue, CounterValue}
