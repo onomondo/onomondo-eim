@@ -262,7 +262,7 @@ store_euicc_pubkey_from_authenticateResponseOk(AuthRespOk, EidValue) ->
 	{ok, <<>>} ->
 	    % There is no public key stored yet for this eUICC, use the public
 	    % key provided in the eUICC certificate
-	    EumCertificate =  maps:get(eumCertificate, AuthRespOk),
+	    EumCertificate = maps:get(eumCertificate, AuthRespOk),
 	    EuiccCertificate = maps:get(euiccCertificate, AuthRespOk),
 	    store_euicc_pubkey(EumCertificate, EuiccCertificate, EidValue);
 	_ ->
