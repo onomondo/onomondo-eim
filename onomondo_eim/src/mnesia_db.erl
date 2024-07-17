@@ -340,30 +340,35 @@ work_bind(Pid, TransactionId) ->
 % before. It can also be called multiple times.
 work_pickup(Pid, TransactionId) ->
     % In case a TransactionId is provied, bind the PID to this TransactionId,
-    case TransactionId of
+    WorkBound = case TransactionId of
 	none ->
 	    ok;
 	_ ->
-	    ok = work_bind(Pid, TransactionId)
+	    work_bind(Pid, TransactionId)
     end,
 
     % Lookup the work state by the given PID
-    Trans = fun() ->
-		    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} ||
-				  X <- mnesia:table(work), X#work.pid == Pid]),
-		    qlc:e(Q)
-	    end,
-    {atomic, Result} = mnesia:transaction(Trans),
-    case Result of
-	[{EidValue, Order, State} | _] ->
-	    {EidValue, Order, State};
-	[] ->
-	    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?,~nPid=~p~n",
-			 [Pid]),
-	    none;
+    case WorkBound of
+	ok ->
+	    Trans = fun() ->
+			    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} ||
+					  X <- mnesia:table(work), X#work.pid == Pid]),
+			    qlc:e(Q)
+		    end,
+	    {atomic, Result} = mnesia:transaction(Trans),
+	    case Result of
+		[{EidValue, Order, State} | _] ->
+		    {EidValue, Order, State};
+		[] ->
+		    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?,~nPid=~p~n",
+				 [Pid]),
+		    none;
+		_ ->
+		    logger:error("Work: cannot pick up work item, database error,~nPid=~p~n", [Pid]),
+		    error
+	    end;
 	_ ->
-	    logger:error("Work: cannot pick up work item, database error,~nPid=~p~n", [Pid]),
-	    error
+	    WorkBound
     end.
 
 % Update a work item that is in progress. This fuction updates the state (any user defined term) of the work item.
