@@ -204,33 +204,52 @@ verify_cert(TrustedCert, VerifyCert) ->
 	    error
     end.
 
-verify_euicc_cert(EumCertificate, EuiccCertificate) ->
-    {ok, RootCiCertPath} = application:get_env(onomondo_eim, root_ci_cert),
+get_root_cert(EumCertificate, []) ->
+    logger:error("Certificate verification failed, no root certificate found,~nEumCertificate=~p~n", [EumCertificate]),
+    error;
+get_root_cert(EumCertificate, RootCiCertPaths) ->
+    [RootCiCertPath | RootCiCertPathsTail ] = RootCiCertPaths,
     {ok, RootCiCertPem} = file:read_file(RootCiCertPath),
     [{'Certificate', RootCiCertBer, not_encrypted}] = public_key:pem_decode(RootCiCertPem),
-    {ok, RootCiCert} = 'PKIX1Explicit88':decode('Certificate', RootCiCertBer),
+    {ok, EumCertificateBer} = 'PKIX1Explicit88':encode('Certificate', EumCertificate),
+    case public_key:pkix_is_issuer(EumCertificateBer, RootCiCertBer) of
+	true ->
+	    {ok, RootCiCertPem};
+	_ ->
+	    get_root_cert(EumCertificate, RootCiCertPathsTail)
+    end.
 
-    % TODO: The certificate chain validation done here only performs a basic signature validation. However, a
-    % spec compliant certifiate chain verification should include:
-    %
-    % * expiration dates: no certificate in the chain must be expired.
-    % * CRL (certificate revocation lists, indicated in the CI cert): no revoked cert should be accepted.
-    % * serial number constraint of EUM certificate: first 8 digits of EID of eUICC certificate must be within
-    %   scope of EUM certificate.
-    % * CA certificate must
-    %   - have extension for basic constraints CA=true
-    %   - have extension for key usage "keyCertSign"
-    % * EUM certificate must
-    %   - have extension for basic constraints CA=true, pathLenConstraint == 0
-    %   - have extension for key usage "keyCertSign"
-    % * eUICC certificate must
-    %   - have extension for key usage "digitalSignature"
+verify_euicc_cert(EumCertificate, EuiccCertificate) ->
+    {ok, RootCiCertPaths} = application:get_env(onomondo_eim, root_ci_certs),
+    case get_root_cert(EumCertificate, RootCiCertPaths) of
+	{ok, RootCiCertPem} ->
+	    [{'Certificate', RootCiCertBer, not_encrypted}] = public_key:pem_decode(RootCiCertPem),
+	    {ok, RootCiCert} = 'PKIX1Explicit88':decode('Certificate', RootCiCertBer),
 
-    case verify_cert(RootCiCert, EumCertificate) of
-	ok ->
-	    case verify_cert(EumCertificate, EuiccCertificate) of
+	    % TODO: The certificate chain validation done here only performs a basic signature validation. However, a
+	    % spec compliant certifiate chain verification should include:
+	    %
+	    % * expiration dates: no certificate in the chain must be expired.
+	    % * CRL (certificate revocation lists, indicated in the CI cert): no revoked cert should be accepted.
+	    % * serial number constraint of EUM certificate: first 8 digits of EID of eUICC certificate must be within
+	    %   scope of EUM certificate.
+	    % * CA certificate must
+	    %   - have extension for basic constraints CA=true
+	    %   - have extension for key usage "keyCertSign"
+	    % * EUM certificate must
+	    %   - have extension for basic constraints CA=true, pathLenConstraint == 0
+	    %   - have extension for key usage "keyCertSign"
+	    % * eUICC certificate must
+	    %   - have extension for key usage "digitalSignature"
+
+	    case verify_cert(RootCiCert, EumCertificate) of
 		ok ->
-		    ok;
+		    case verify_cert(EumCertificate, EuiccCertificate) of
+			ok ->
+			    ok;
+			_ ->
+			    error
+		    end;
 		_ ->
 		    error
 	    end;

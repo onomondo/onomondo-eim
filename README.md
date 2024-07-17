@@ -115,7 +115,7 @@ cases, those parameters do not have to be modified.
 * `rest_timeout_stuck`: Configure timeout until an order/procedure (e.g. profile download) must finish.
 * `rest_timeout_noshow`: Configure timeout until an order/procedure must start.
 * `rest_timeout_expired`: Configure timeout until the REST API user must lookup/delete the order via the REST API
-* `root_ci_cert`: Root certificate of the eUICC CI (to verify EUM and eUICC certificate)
+* `root_ci_certs`: Root certificates of the eUICC CI (to verify EUM and eUICC certificate)
 
 #### Timeout Behavior
 
