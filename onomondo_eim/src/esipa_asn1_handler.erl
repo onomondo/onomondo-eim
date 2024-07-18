@@ -11,14 +11,14 @@
 
 %GSMA SGP.32, section 6.3.2.1
 handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
-    % TODO: insert smdpAddress and/or eUICCInfo1 are optional fields in ESipa, which means they may be absent.
-    % However in ES9+ those fields are mandatory. This means we may need to fill in those fields here, from cached
-    % values.
-
     {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
     BaseUrl = maps:get(smdpAddress, EsipaReq),
     NewWorkState = WorkState#{smdpAddress => BaseUrl},
     mnesia_db:work_update(maps:get(pid, Req0), NewWorkState),
+
+    % euiccInfo1 is also an optional field in initiateAuthenticationRequestEsipa and a mandatory field in
+    % initiateAuthenticationRequest. However the field is only missing in case the IPA capability minimizeEsipaBytes is
+    % used. This is an optional feature that this eIM does not support, so we can expect euiccInfo1 to be always present.
 
     % setup ES9+ request message
     Es9Req = {initiateAuthenticationRequest, EsipaReq},
@@ -31,9 +31,14 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
 		    {initiateAuthenticationOk, InitAuthOk} ->
 			TransactionId = maps:get(transactionId, InitAuthOk),
 			mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
-                        % TODO: InitiateAuthenticationOkEsipa has matchingId and ctxPrams1 as optional members. In case
-                        % we are able to populate those fields from cached values, we should do so.
-                        % maps:merge(InitAuthOk, #{matchingId => FIXME, ctxPrams1 => FIXME}),
+			% TODO: matchingId and ctxParams1 are not defined in the ES9+ InitiateAuthenticationResponse message.
+			% However in ESipa those fields are optional fields and either one of it should be populated in case an
+			% AC is used (which we do). This means we should populate those fields. The matchingId can be extracted
+			% from the AC, which we have in the Order. If the IPAd supports eimCtxParams1Generation then it should
+			% be find if we would just add the matchingId field like so: maps:merge(InitAuthOk, #{matchingId =>
+			% FIXME). Otherwise we would have to add a ctxParams1 field and populate it with the matchingId and the
+			% deviceInfo. The deviceInfo can be retrieved via an eUICC data request.
+			% (see GSMA SGP.32, section 3.1.2.3).
 			{initiateAuthenticationOkEsipa, InitAuthOk};
 		    {initiateAuthenticationError, InitAuthErr} ->
 			ok = mnesia_db:work_finish(maps:get(pid, Req0),
@@ -112,7 +117,8 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
     % setup ESipa response message
     EsipaResp = case Es9Resp of
 		    {getBoundProfilePackageOk, GetBndPrflePkgOk} ->
-			% (in case IPA Capability 'minimizeEsipaBytes' is used, the transactionId has to be removed.)
+			% (in case IPA Capability minimizeEsipaByte' is used, the transactionId has to be removed,
+			%  however, this eIM does not support the IPA capability minimizeEsipaBytes)
 			{getBoundProfilePackageOkEsipa, GetBndPrflePkgOk};
 		    {getBoundProfilePackageError, GetBndPrflePkgErr} ->
 			ok = mnesia_db:work_finish(maps:get(pid, Req0),
@@ -217,19 +223,18 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
 
 %GSMA SGP.32, section 6.3.2.6
 handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
-    % TODO: Some state has changed on the eUICC, clarify what kind of data we should request when this happens.
-    % NotifStateChg = maps:is_key(notifyStateChange, EsipaReq),
+    % TODO: The purpose of the notifyStateChange field in the getEimPackageRequest is to inform the eIM that some state
+    % in the eUICC has changed and that the eIM (and in particular the REST API user) should perform an update of its
+    % local records (eUICC data request, listProfileInfo PSMO etc...) This is a feature that this eIM does not support
+    % yet. To implement the feature we could use a flag in the euicc table to tell the REST API user to perform the
+    % update. Get the notifyStateChange flag like so: NotifStateChg = maps:is_key(notifyStateChange, EsipaReq).
 
-    % setup ESipa response message
-    % TODO: Besides profileDownloadTriggerRequest, there is also euiccPackageRequest, ipaEuiccDataRequest, and
-    % eimAcknowledgements.
-
-    % We won't get a TransactionId here yet (except for eUICC packages where we must generate it ourselves).
-    % The first time we see a TransactionId is in the SMDP+ response to the initiateAuthenticationRequest
     EidValue = maps:get(eidValue, EsipaReq),
     Work = mnesia_db:work_fetch(utils:binary_to_hex(EidValue), maps:get(pid, Req0)),
     EsipaResp = case Work of
 		    {download, Order} ->
+			% The first time we see a TransactionId is in the SMDP+ response to the
+			% initiateAuthenticationRequest
 			{[{<<"download">>, {[{<<"activationCode">>, ActivationCode}]}}]} = Order,
 			mnesia_db:work_update(maps:get(pid, Req0), #{}),
 			{profileDownloadTriggerRequest, #{profileDownloadData => {activationCode, ActivationCode}}};
@@ -293,7 +298,10 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
 	{euiccPackageResult, EuiccPackageResult} ->
 	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
 	{ePRAndNotifications, EPRAndNotifications} ->
-	    % TODO: Do something useful with the notificationList, that is also included in this response
+	    % TODO: Do something useful with the notificationList, that is also included in this response. What we
+	    % could do is crafting a suitable data structure for each of the notifications and then call
+	    % handle_asn1(Req0, State, {handleNotificationEsipa, CraftedEsipaReq}) in a loop for each of the
+	    % notifications.
 	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
 	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
 	{ipaEuiccDataResponse, IpaEuiccDataResponse} ->
@@ -303,7 +311,10 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
 	    Outcome = esipa_rest_utils:ipaEuiccDataResponse_to_outcome(IpaEuiccDataResponse),
 	    mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
 	{profileDownloadTriggerResult, _} ->
-	    throw("TODO: Implement handling of incoming profileDownloadTriggerResult");
+	    % The profileDownloadTriggerResult is sent by the IPAd in case a profile was downloaded directly from an
+	    % RSP server, bypassing the eIM (see also SGP.32, section 3.2.3.1). This is a feature that this eIM does
+	    % not support.
+	    throw("unsuppported message type \"profileDownloadTriggerResult\"");
 	{eimPackageError, EimPackageError} ->
 	    Outcome = [{[{eimPackageError, EimPackageError}]}],
 	    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq)

@@ -238,7 +238,9 @@ request_json({handleNotification, HandleNotifReq}, BaseUrl) ->
 % (See also SGP.22 6.6.2.1 - 6.6.2.5)
 request_asn1(RemPpr, BaseUrl) ->
     {ok, _HttpStatus, Asn1Resp} = make_req_asn1(BaseUrl, RemPpr),
-    % TODO: check HTTP status?
+    % TODO: check HTTP status, we may also need special handling for handleNotification, which has no response data.
+    % In any case, this function is currently place holder, since this eIM currently only supports ES9+ JSON bindings
+    % (esipa_asn1_handler currently only calls request_json).
     Asn1Resp.
 
 tryme() ->
