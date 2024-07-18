@@ -364,7 +364,7 @@ Database
 To keep state, onomondo-eim uses an mnesia database. The database files are automatically created on the first startup.
 The database contains three tables. `rest`, `work` and `euicc`.
 
-### rest Table
+### `rest` Table
 
 In this table the rest resources are stored along with their status information. This is also the table where the REST
 API user is maintaining the REST resources in. The column names are similar to the field names used on the REST API
@@ -405,7 +405,7 @@ Example: displaying the contents of the `rest` table on the erlang shell
        new,1719406847,[],none}]
 ```
 
-### work Table
+### `work` Table
 
 The `status` in the `rest` table is changed from `new` to `work` as soon as the related procedure begins to execute.
 To maintain the state of the specific procedure the `work` table is used. This table is kept in RAM only, which means
@@ -446,7 +446,7 @@ Example: displaying the contents of the `work` table on the erlang shell
        #{smdpAddress => <<"smdpp.test.rsp.sysmocom.de">>}}]
 ```
 
-### euicc Table
+### `euicc` Table
 
 The `euicc` table contains the eUICC master data. This is in particular the EID and other meta information that is
 required for the eIM to operate. The data in this table is usually automatically collected and updated by the eIM.
