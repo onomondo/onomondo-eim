@@ -68,10 +68,10 @@ init() ->
 	{error, {_, {already_exists, _}}} ->
 	    ok;
 	ok ->
-	    logger:notice("    mnesia database schema created~n")
+	    logger:notice("    mnesia database schema created\n")
     end,
     ok = mnesia:start(),
-    logger:notice("    mnesia started~n"),
+    logger:notice("    mnesia started\n"),
 
     % The rest table is a persistent table, so even after a crash it will be possible to continue pending orders.
     case mnesia:create_table(rest,
@@ -82,7 +82,7 @@ init() ->
 	{aborted, {already_exists, rest}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    rest table created~n")
+	    logger:notice("    rest table created\n")
     end,
 
     % The work table is volatile. It only contains intermediate results. When the eIM is restarted and there is a
@@ -95,7 +95,7 @@ init() ->
 	{aborted, {already_exists, work}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    work table created~n")
+	    logger:notice("    work table created\n")
     end,
 
     % The euicc table will store the eUICC master data, such as the eID and the counterValue that is required for
@@ -114,7 +114,7 @@ init() ->
     % Wait until the mnesia tables become available.
     case mnesia:wait_for_tables([rest, work], 60000) of
 	{timeout, _} ->
-	    logger:error("    unable to synchronize mnesia tables~n"),
+	    logger:error("    unable to synchronize mnesia tables\n"),
 	    throw("normal operation not possible");
 	ok ->
 	    ok
