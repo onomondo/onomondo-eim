@@ -93,9 +93,9 @@ Once the application is running it will display a prompt. To exit the applicatio
 (To run onomondo-eim under the control of `systemd`, the example service file /contrib/onomondo-eim.service may be
 used)
 
-To verify that the ESipa interface is reachable it can be probed using a webbrowser. In the example above, the ESipa
+To verify that the ESipa interface is reachable it can be probed using a web-browser. In the example above, the ESipa
 interface runs on 127.0.0.1, port 8000 and uses SSL. It can be probed by typing "https://127.0.0.1:8000/" into the
-address line of a webbrowser. The result should be the string "eIM working!". The REST interface can be probed with
+address line of a web-browser. The result should be the string "eIM working!". The REST interface can be probed with
 the same method (see section `eIM Information`).
 
 Configuration
@@ -134,7 +134,7 @@ The three REST API related timeouts (`rest_timeout_`) ensure that the underlying
 overflow over time in case REST API users fail to monitor their orders and most importantly, delete their orders when
 done.
 
-* The timeout `rest_timeout_stuck` gurds against stuck orders. Orders may get stuck due to communication errors between
+* The timeout `rest_timeout_stuck` guards against stuck orders. Orders may get stuck due to communication errors between
   SMDP+ or IPAd. When a procedure is stuck for too long it gets marked as done and an appropriate `procedureError` code
   is communicated to the REST API user. Since a procedure usually won't take more than a few minutes (usually below one
   minute) 300 sec. would be a good compromise here.
@@ -155,18 +155,18 @@ done.
 
 #### Consumer eUICCs
 
-Consumer eUICCs are normally not used in an eIM/IPAd infrastructure. They are intended to be used in consumer devies
+Consumer eUICCs are normally not used in an eIM/IPAd infrastructure. They are intended to be used in consumer devices
 where the user controls the eUICC directly using an LPA software. However, it is still possible to use a consumer
 eUICC like an IoT eUICC when the remote IPAd supports an IoT eUICC emulation mode. Unfortunately the emulation will
 lack some features, this is in particular the cryptographic signing of the PSMOs / eCOs exchanged between the eIM and
 the IoT eUICC emulation. To get around this, the eIM must know which eUICC is a real IoT eUICC and which eUICC is
 actually a consumer eUICC hiding behind an IoT eUICC emulation.
 
-Onomondo-eim supports the simultanious usage of IoT eUICCs and consumer eUICCs. The type of the eUICC must be set for
+Onomondo-eim supports the simultaneous usage of IoT eUICCs and consumer eUICCs. The type of the eUICC must be set for
 each eUICC via the REST API once, if it differs from the default set with the configuration option `consumer_euicc`.
 
 For larger installations, where both flavours of eUICCs are used, it is recommended to run two dedicated eIM
-instances, one for each eUICC flavour.
+instances, one for each eUICC flavor.
 
 ### vm.args
 
@@ -296,7 +296,7 @@ Example: A typical delete response
 
 In case the API user forgets to delete the REST resource for some reason, the REST resource it will not stay in the
 database indefinitely. After some generous timeout, the eIM will automatically delete the REST resource from the REST
-table. However, the intension behind this mechanism is to guard against database memory leaks and is not intended to be
+table. However, the intention behind this mechanism is to guard against database memory leaks and is not intended to be
 used as the general mechanism to get rid of REST resources that are no longer used.
 
 #### Listing REST resources
@@ -397,7 +397,7 @@ tryme.cfg and to pass all parameters from the commandline instead.
 
 In the following we will discuss how a profile download is triggered and how the results should look like. In the
 following example we will pass all parameters directly from the commandline. It is assumed that the REST API of
-onomondo-eim is avaliable at 127.0.0.1:8080.
+onomondo-eim is available at 127.0.0.1:8080.
 
 In the first step we will issue a download `order` using the `tryme_download.sh`. The parameter `X` tells tryme.cfg to
 use the placeholder profile. The second parameter is the EID (not to be confused with ICCID) of the eUICC. The
@@ -491,8 +491,8 @@ Example: displaying the contents of the `rest` table on the erlang shell
 
 The `status` in the `rest` table is changed from `new` to `work` as soon as the related procedure begins to execute.
 To maintain the state of the specific procedure the `work` table is used. This table is kept in RAM only, which means
-that its contents are volatile. This is a performance optimization. The work state may be updated quite frquently
-and in case the eIM has to handle a lot of IPAd clients simultaniously it is better not to synchronize
+that its contents are volatile. This is a performance optimization. The work state may be updated quite frequently
+and in case the eIM has to handle a lot of IPAd clients simultaneously it is better not to synchronize
 each state change to the disk. The state in the `work` table is also only valuable during the execution of the
 procedure and a restart of the eIM while a procedure is running forcefully will terminate a procedure anyway.
 
@@ -565,7 +565,7 @@ request.
 
 #### Entry Creation
 
-As already mentioned, the eIM will automatically collect the information needed to populete the `euicc` table. The
+As already mentioned, the eIM will automatically collect the information needed to populate the `euicc` table. The
 process begins with the first appearance of a new eID on the REST API. This means that the eIM will automatically
 create an entry for a new eUICC only as a consequence of REAT API operations. ESipa requests from an unknown eID
 will have no effect.
