@@ -108,7 +108,7 @@ init() ->
 	{aborted, {already_exists, euicc}} ->
 	    ok;
 	{atomic, ok} ->
-	    logger:notice("    euicc table created~n")
+	    logger:notice("    euicc table created\n")
     end,
 
     % Wait until the mnesia tables become available.
