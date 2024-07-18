@@ -25,7 +25,8 @@ make_req_json(BaseUrl, Function, JsonBody) ->
     % see SGP.22 Section 6.5 for details on HTTP Function Binding in JSON
     Method = post,
     % construct URL from global hostname, static path and function
-    URL = list_to_binary(string:join([make_http_prefix(), binary_to_list(BaseUrl), "/gsma/rsp2/es9plus/", Function], "")),
+    URL = list_to_binary(string:join([make_http_prefix(),
+				      binary_to_list(BaseUrl), "/gsma/rsp2/es9plus/", Function], "")),
     ReqHeaders = [ {<<"Content-Type">>, <<"application/json;charset=UTF-8">>},
 		   {<<"X-Admin-Protocol">>, <<"gsma/rsp/v2.1.0">>} ],
     % Add a request header (see also: GSMA SGP.22 6.5.1.3)
@@ -101,8 +102,8 @@ make_req_asn1(BaseUrl, Asn1Body) ->
 							    [URL]),
 					      <<>>;
 					  _ ->
-					      {ok, Asn1Decoded} = 'RSPDefinitions':decode('RemoteProfileProvisioningResponse',
-											  RespBody),
+					      {ok, Asn1Decoded} =
+						  'RSPDefinitions':decode('RemoteProfileProvisioningResponse', RespBody),
 					      Asn1Decoded
 				      end;
 				  _ -> <<>>
@@ -146,7 +147,8 @@ request_json({initiateAuthenticationRequest, InitAuthReq}, BaseUrl) ->
 			   serverSigned1 => rsp_dec_b64_asn1('ServerSigned1', maps:get(<<"serverSigned1">>, JsonResp)),
 			   serverSignature1 => base64:decode(maps:get(<<"serverSignature1">>, JsonResp)),
 			   euiccCiPKIdToBeUsed => base64:decode(maps:get(<<"euiccCiPKIdToBeUsed">>, JsonResp)),
-			   serverCertificate => pki_dec_b64_asn1('Certificate', maps:get(<<"serverCertificate">>, JsonResp))},
+			   serverCertificate => pki_dec_b64_asn1('Certificate', maps:get(<<"serverCertificate">>,
+											 JsonResp))},
 		     {initiateAuthenticationOk, R};
 		 _ ->
 		     {initiateAuthenticationError, 127}
@@ -165,10 +167,12 @@ request_json({authenticateClientRequest, AuthClientReq}, BaseUrl) ->
     Choice = case JsonResp of
 		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
 		     R = #{transactionId => utils:hex_to_binary(maps:get(<<"transactionId">>, JsonResp)),
-			   profileMetaData => rsp_dec_b64_asn1('StoreMetadataRequest', maps:get(<<"profileMetadata">>, JsonResp)),
+			   profileMetaData => rsp_dec_b64_asn1('StoreMetadataRequest', maps:get(<<"profileMetadata">>,
+												JsonResp)),
 			   smdpSigned2 => rsp_dec_b64_asn1('SmdpSigned2', maps:get(<<"smdpSigned2">>, JsonResp)),
 			   smdpSignature2 => base64:decode(maps:get(<<"smdpSignature2">>, JsonResp)),
-			   smdpCertificate => pki_dec_b64_asn1('Certificate', maps:get(<<"smdpCertificate">>, JsonResp))},
+			   smdpCertificate => pki_dec_b64_asn1('Certificate',
+							       maps:get(<<"smdpCertificate">>, JsonResp))},
 		     {authenticateClientOk, R};
 		 _ ->
 		     {authenticateClientError, 127}
@@ -179,12 +183,14 @@ request_json({authenticateClientRequest, AuthClientReq}, BaseUrl) ->
 % GSMA SGP.22, section 6.5.2.7 and section 6.6.2.3
 request_json({getBoundProfilePackageRequest, GetBppReq}, BaseUrl) ->
     Json = #{<<"transactionId">> => utils:binary_to_hex(maps:get(transactionId, GetBppReq)),
-	     <<"prepareDownloadResponse">> => rsp_enc_asn1_b64('PrepareDownloadResponse', maps:get(prepareDownloadResponse, GetBppReq))},
+	     <<"prepareDownloadResponse">> => rsp_enc_asn1_b64('PrepareDownloadResponse',
+							       maps:get(prepareDownloadResponse, GetBppReq))},
     {ok, _HtppStatus, JsonResp} = make_req_json(BaseUrl, "getBoundProfilePackage", Json),
     Choice = case JsonResp of
 		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
 		     R = #{transactionId => utils:hex_to_binary(maps:get(<<"transactionId">>, JsonResp)),
-			   boundProfilePackage => rsp_dec_b64_asn1('BoundProfilePackage', maps:get(<<"boundProfilePackage">>, JsonResp))},
+			   boundProfilePackage => rsp_dec_b64_asn1('BoundProfilePackage',
+								   maps:get(<<"boundProfilePackage">>, JsonResp))},
 		     {getBoundProfilePackageOk, R};
 		 _ ->
 		     {getBoundProfilePackageError, 127}
@@ -195,7 +201,8 @@ request_json({getBoundProfilePackageRequest, GetBppReq}, BaseUrl) ->
 % GSMA SGP.22, section 6.5.2.10 and section 6.6.2.5
 request_json({cancelSessionRequestEs9, CancelSessReq}, BaseUrl) ->
     Json = #{<<"transactionId">> => utils:binary_to_hex(maps:get(transactionId, CancelSessReq)),
-	     <<"cancelSessionResponse">> => rsp_enc_asn1_b64('CancelSessionResponse', maps:get(cancelSessionResponse, CancelSessReq))},
+	     <<"cancelSessionResponse">> => rsp_enc_asn1_b64('CancelSessionResponse',
+							     maps:get(cancelSessionResponse, CancelSessReq))},
     {ok, _HtppStatus, JsonResp} = make_req_json(BaseUrl, "cancelSession", Json),
     Choice = case JsonResp of
 		 #{<<"header">> := #{<<"functionExecutionStatus">> := #{<<"status">> := <<"Executed-Success">>}}} ->
@@ -209,7 +216,8 @@ request_json({cancelSessionRequestEs9, CancelSessReq}, BaseUrl) ->
 
 % GSMA SGP.22, section 6.5.2.9 and section 6.6.2.4
 request_json({handleNotification, HandleNotifReq}, BaseUrl) ->
-    Json = #{<<"pendingNotification">> => rsp_enc_asn1_b64('PendingNotification', maps:get(pendingNotification, HandleNotifReq))},
+    Json = #{<<"pendingNotification">> => rsp_enc_asn1_b64('PendingNotification',
+							   maps:get(pendingNotification, HandleNotifReq))},
     {ok, HtppStatus, _JsonResp} = make_req_json(BaseUrl, "handleNotification", Json),
     % There is no response defined for this function (see also SGP.22, section 5.6.4), so we send just forward an
     % an empty tuple.

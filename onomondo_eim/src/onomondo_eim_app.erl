@@ -24,7 +24,8 @@ start(_Type, _Args) ->
                {"/gsma/rsp2/esipa/provideEimPackageResult", esipa_provideEimPackageresult_handler, []},
                {"/gsma/rsp2/esipa/handleNotification", esipa_handleNotification_handler, []},
                {"/gsma/rsp2/esipa/cancelSession", esipa_cancelSession_handler, []},
-               % SGP.32 Section 6.1.1: Any function execution request using ASN.1 binding SHALL be sent to the generic HTTP path 'gsma/rsp2/asn1'
+               % SGP.32 Section 6.1.1: Any function execution request using ASN.1 binding SHALL be sent to the generic
+	       % HTTP path 'gsma/rsp2/asn1'
                {"/gsma/rsp2/asn1", esipa_asn1_handler, []},
 	       % MISC
                {"/", esipa_infopage, []}

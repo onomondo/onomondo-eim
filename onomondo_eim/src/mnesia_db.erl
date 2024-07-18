@@ -21,8 +21,20 @@
 % trigger recurring events (called automatically by timer from this module)
 -export([cleanup/0, euicc_setparam/0]).
 
--record(rest, {resourceId :: binary(), facility :: atom(), eidValue :: binary(), order, status :: atom(), timestamp :: integer(), outcome, debuginfo :: binary()}).
--record(work, {pid :: pid(), resourceId :: binary(), transactionId :: binary(), eidValue :: binary(), order, state}).
+-record(rest, {resourceId :: binary(),
+	       facility :: atom(),
+	       eidValue :: binary(),
+	       order,
+	       status :: atom(),
+	       timestamp :: integer(),
+	       outcome,
+	       debuginfo :: binary()}).
+-record(work, {pid :: pid(),
+	       resourceId :: binary(),
+	       transactionId :: binary(),
+	       eidValue :: binary(),
+	       order,
+	       state}).
 -record(euicc, {eidValue :: binary(),
 		counterValue :: integer(),
 		consumerEuicc :: boolean(),
@@ -590,7 +602,8 @@ mark_stuck(Timeout) ->
 
     % Find all rest resources that stall in status "work" and older than the specified timeout value
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work, TimestampNow - X#rest.timestamp > Timeout]),
+		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest),
+						    X#rest.status == work, TimestampNow - X#rest.timestamp > Timeout]),
 		    Rows = qlc:e(Q),
 		    case Rows of
 			[] ->

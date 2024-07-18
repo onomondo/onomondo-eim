@@ -36,7 +36,8 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
                         % maps:merge(InitAuthOk, #{matchingId => FIXME, ctxPrams1 => FIXME}),
 			{initiateAuthenticationOkEsipa, InitAuthOk};
 		    {initiateAuthenticationError, InitAuthErr} ->
-			ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, initiateAuthenticationError}]}], EsipaReq),
+			ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						   [{[{procedureError, initiateAuthenticationError}]}], EsipaReq),
 			{initiateAuthenticationErrorEsipa, InitAuthErr}
 		end,
     {initiateAuthenticationResponseEsipa, EsipaResp};
@@ -57,7 +58,8 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseOk, AuthRespOk}}};
 		 {authenticateResponseError, AuthRespErr} ->
-		     ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, authenticateResponseError}]}], EsipaReq),
+		     ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						[{[{procedureError, authenticateResponseError}]}], EsipaReq),
 		     {authenticateClientRequest,
 		      #{transactionId => TransactionId,
 			authenticateServerResponse => {authenticateResponseError, AuthRespErr}}};
@@ -74,7 +76,8 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
 		    {authenticateClientOk, AuthClntRespEs9} ->
 			{authenticateClientOkDPEsipa, AuthClntRespEs9};
 		    {authenticateClientError, AuthClntErr} ->
-			ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, authenticateClientError}]}], EsipaReq),
+			ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						   [{[{procedureError, authenticateClientError}]}], EsipaReq),
 			{authenticateClientErrorEsipa, AuthClntErr}
 		end,
     {authenticateClientResponseEsipa, EsipaResp};
@@ -93,7 +96,8 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			prepareDownloadResponse => {downloadResponseOk, DwnldRespOk}}};
 		 {downloadResponseError, DwnldRespErr} ->
-		     ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, downloadResponseError}]}], EsipaReq),
+		     ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						[{[{procedureError, downloadResponseError}]}], EsipaReq),
 		     {getBoundProfilePackageRequest,
 		      #{transactionId => TransactionId,
 			prepareDownloadResponse => {downloadResponseError, DwnldRespErr}}};
@@ -111,7 +115,8 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
 			% (in case IPA Capability 'minimizeEsipaBytes' is used, the transactionId has to be removed.)
 			{getBoundProfilePackageOkEsipa, GetBndPrflePkgOk};
 		    {getBoundProfilePackageError, GetBndPrflePkgErr} ->
-			ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, getBoundProfilePackageError}]}], EsipaReq),
+			ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						   [{[{procedureError, getBoundProfilePackageError}]}], EsipaReq),
 			{getBoundProfilePackageErrorEsipa, GetBndPrflePkgErr}
 		end,
     {getBoundProfilePackageResponseEsipa, EsipaResp};
@@ -130,7 +135,8 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
 		      #{transactionId => TransactionId,
 			cancelSessionResponse => {cancelSessionResponseOk, CancelSessionRespOk}}};
 		 {cancelSessionResponseError, CancelSessionRespErr} ->
-		     ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, cancelSessionResponseError}]}], EsipaReq),
+		     ok = mnesia_db:work_finish(maps:get(pid, Req0),
+						[{[{procedureError, cancelSessionResponseError}]}], EsipaReq),
 		     {cancelSessionRequestEs9,
 		      #{transactionId => TransactionId,
 			cancelSessionResponse => {cancelSessionResponseError, CancelSessionRespErr}}};
@@ -230,10 +236,12 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 		    {psmo, Order} ->
 			TransactionIdPsmo = rand:bytes(16),
 			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdPsmo),
-			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue, TransactionIdPsmo),
+			EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(Order, EidValue,
+											       TransactionIdPsmo),
 			case EuiccPackageSigned of
 			    error ->
-				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badPsmo}]}], EsipaReq),
+				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badPsmo}]}],
+							   EsipaReq),
 				{eimPackageError, undefinedError};
 			    _ ->
 				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned,
@@ -246,10 +254,12 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 		    {eco, Order} ->
 			TransactionIdEco = rand:bytes(16),
 			mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdEco),
-			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue, TransactionIdEco),
+			EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(Order, EidValue,
+											      TransactionIdEco),
 			case EuiccPackageSigned of
 			    error ->
-				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEco}]}], EsipaReq),
+				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEco}]}],
+							   EsipaReq),
 				{eimPackageError, undefinedError};
 			    _ ->
 				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned,
@@ -263,7 +273,8 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			IpaEuiccDataRequest = esipa_rest_utils:edr_order_to_ipaEuiccDataRequest(Order),
 			case IpaEuiccDataRequest of
 			    error ->
-				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEdr}]}], EsipaReq),
+				ok = mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, badEdr}]}],
+							   EsipaReq),
 				{eimPackageError, undefinedError};
 			    _ ->
 				IpaEuiccDataRequest
@@ -354,6 +365,7 @@ terminate(Reason, Req0, _State) ->
 	    ok;
 	_ ->
 	    mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, undefinedError}]}], Reason),
-	    logger:info("Handling of IPAd request terminated unexpectetly, Reason=~p Pid=~p~n", [Reason, maps:get(pid, Req0)]),
+	    logger:info("Handling of IPAd request terminated unexpectetly, Reason=~p Pid=~p~n",
+			[Reason, maps:get(pid, Req0)]),
 	    cowboy_req:reply(500, ?RESPONSE_HEADERS, <<"Internal Server Error">>, Req0)
     end.

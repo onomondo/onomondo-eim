@@ -200,7 +200,8 @@ verify_cert(TrustedCert, VerifyCert) ->
 	true ->
 	    ok;
 	_ ->
-	    logger:error("Certificate verification failed,~nVerifyCert=~p,~nECPublicKey=~p~n", [VerifyCert, ECPublicKey]),
+	    logger:error("Certificate verification failed,~nVerifyCert=~p,~nECPublicKey=~p~n",
+			 [VerifyCert, ECPublicKey]),
 	    error
     end.
 

@@ -44,11 +44,14 @@ psmo_to_asn_listProfileInfo(Psmo) ->
 	{[{<<"searchCriteria">>, SearchCriteria}, {<<"tagList">>, TagList}]} ->
 	    case SearchCriteria of
 		{[{<<"isdpAid">>, IsdpAid}]} ->
-		    {listProfileInfo, #{searchCriteria => {isdpAid, utils:hex_to_binary(IsdpAid)}, tagList => utils:hex_to_binary(TagList) }};
+		    {listProfileInfo, #{searchCriteria => {isdpAid, utils:hex_to_binary(IsdpAid)},
+					tagList => utils:hex_to_binary(TagList) }};
 		{[{<<"iccid">>, Iccid}]} ->
-		    {listProfileInfo, #{searchCriteria => {iccid, utils:hex_to_binary(Iccid)}, tagList => utils:hex_to_binary(TagList) }};
+		    {listProfileInfo, #{searchCriteria => {iccid, utils:hex_to_binary(Iccid)},
+					tagList => utils:hex_to_binary(TagList) }};
 		{[{<<"profileClass">>, ProfileClass}]} ->
-		    {listProfileInfo, #{searchCriteria => {profileClass, utils:hex_to_integer(ProfileClass)}, tagList => utils:hex_to_binary(TagList) }};
+		    {listProfileInfo, #{searchCriteria => {profileClass, utils:hex_to_integer(ProfileClass)},
+					tagList => utils:hex_to_binary(TagList) }};
 		_ ->
 		    logger:error("REST: order with bad listProfilesInfo PSMO: ~p~n", [Psmo]),
 		    error
@@ -86,7 +89,8 @@ psmo_to_asn_getRAT(Psmo) ->
 psmo_to_asn_configureAutoEnable(Psmo) ->
     case Psmo of
 	{[{<<"autoEnableFlag">>, true}, {<<"smdpOid">>, SmdpOid}, {<<"smdpAddress">>, SmdpAddress}]} ->
-	    {configureAutoEnable, #{autoEnableFlag => null, smdpOid => binary_to_list(SmdpOid), smdpAddress => SmdpAddress}};
+	    {configureAutoEnable, #{autoEnableFlag => null, smdpOid => binary_to_list(SmdpOid),
+				    smdpAddress => SmdpAddress}};
 	{[{<<"autoEnableFlag">>, true}, {<<"smdpOid">>, SmdpOid}]} ->
 	    {configureAutoEnable, #{autoEnableFlag => null, smdpOid => binary_to_list(SmdpOid)}};
 	{[{<<"autoEnableFlag">>, true}, {<<"smdpAddress">>, SmdpAddress}]} ->
