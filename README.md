@@ -556,14 +556,21 @@ Example: displaying the contents of the `euicc` table on the erlang shell
 (onomondo_eim@127.0.0.1)3>
 ```
 
-#### eUICC public key
+#### eUICC Public Key
 
 The eUICC public key information (`signPubKey` and `signAlgo`) can be set via the `euicc` facility of the REST API.
 However, it is not necessary to do so. In case no `signPubKey` is set, onomondo-eim will automatically learn the
 the public key information from the eUICC certificate that is exchanged during a profile download or an eUICC data
 request.
 
-### restart behavior
+#### Entry Creation
+
+As already mentioned, the eIM will automatically collect the information needed to populete the `euicc` table. The
+process begins with the first appearance of a new eID on the REST API. This means that the eIM will automatically
+create an entry for a new eUICC only as a consequence of REAT API operations. ESipa requests from an unknown eID
+will have no effect.
+
+### Restart Behavior
 
 In case the onomondo-eim instance restarts (either normally or due to a system crash). All orders that are currently
 in progress (`status` = `work`) are terminated. Since the `work` table is kept in RAM only it will naturally lose its
