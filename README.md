@@ -112,6 +112,7 @@ cases, those parameters do not have to be modified.
 * `eim_cert`: Configure the location of the certificate that is used for verification of eUICC packages.
 * `eim_key`: Configure the location of the private key that is used for signing eUICC packages.
 * `counter_value`: Set the start value of the replay protection counter (eUICC packages).
+* `consumer_euicc`: Set to true in case the remote ends use a consumer eUICC together with an IoT eUICC emulation mode.
 * `rest_timeout_stuck`: Configure timeout until an order/procedure (e.g. profile download) must finish.
 * `rest_timeout_noshow`: Configure timeout until an order/procedure must start.
 * `rest_timeout_expired`: Configure timeout until the REST API user must lookup/delete the order via the REST API
@@ -141,6 +142,21 @@ orders when done.
   be expired. This means they are deleted silently. Depending on the situation and the quality of the tooling that
   operates the REST API, this timeout can be set generously (hours, days or even weeks). In any case, the timeout should
   not be set lower than `rest_timeout_noshow` for obvious reasons. A recommended timeout value would be 86400 (24h)
+
+#### Consumer eUICCs
+
+Consumer eUICCs are normally not used in an eIM/IPAd infrastructure. They are intended to be used in consumer devies
+where the user controls the eUICC directly using an LPA software. However, it is still possible to use a consumer
+eUICC like an IoT eUICC when the remote IPAd supports an IoT eUICC emulation mode. Unfortunately the emulation will
+lack some features, this is in particular the cryptographic signing of the PSMOs / eCOs exchanged between the eIM and
+the IoT eUICC emulation. To get around this, the eIM must know which eUICC is a real IoT eUICC and which eUICC is
+actually a consumer eUICC hiding behind an IoT eUICC emulation.
+
+Onomondo-eim supports the simultanious usage of IoT eUICCs and consumer eUICCs. The type of the eUICC must be set for
+each eUICC via the REST API once, if it differs from the default set with the configuration option `consumer_euicc`.
+
+For larger installations, where both flavours of eUICCs are used, it is recommended to run two dedicated eIM
+instances, one for each eUICC flavour.
 
 ### vm.args
 

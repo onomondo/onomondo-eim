@@ -438,9 +438,10 @@ work_finish(Pid, Outcome, Debuginfo) ->
 
 trans_euicc_create_if_not_exist(EidValue) ->
     {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
+    {ok, ConsumerEuicc} = application:get_env(onomondo_eim, consumer_euicc),
     Row = #euicc{eidValue = EidValue,
 		 counterValue = CounterValue,
-		 consumerEuicc = true,
+		 consumerEuicc = ConsumerEuicc,
 		 associationToken = 1,
 		 signPubKey = <<>>,
 		 signAlgo = <<"prime256v1">>},

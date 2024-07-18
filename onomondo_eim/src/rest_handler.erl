@@ -85,7 +85,11 @@ get_rest_lookup(Req, State, Facility) ->
 		       Resource = {[{eidValue, EidValue}, {order, Order}]},
 		       DebuginfoHex = utils:binary_to_hex(term_to_binary(Debuginfo)),
 		       TimestampStr = list_to_binary(io_lib:format("~p", [Timestamp])),
-		       {[{status, Status}, {timestamp, TimestampStr}, {resource, Resource}, {outcome, Outcome}, {debuginfo, DebuginfoHex}]};
+		       {[{status, Status},
+			 {timestamp, TimestampStr},
+			 {resource, Resource},
+			 {outcome, Outcome},
+			 {debuginfo, DebuginfoHex}]};
 		   none ->
 		       {[{status, absent}]};
 		   _ ->
@@ -140,6 +144,7 @@ get_rest_info(Req, State) ->
     {ok, EimCertPath} = application:get_env(onomondo_eim, eim_cert),
     {ok, EimCertPem} = file:read_file(EimCertPath),
     {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
+    {ok, ConsumerEuicc} = application:get_env(onomondo_eim, consumer_euicc),
     FormatRootCiCert = fun(RootCiCertPath) ->
 			       {ok, RootCiCertPem} = file:read_file(RootCiCertPath),
 			       RootCiCertPem
@@ -159,7 +164,8 @@ get_rest_info(Req, State) ->
 		  {rootCiCerts, RootCiCertsJson},
 		  {addInitialEimRequest, eim_cfg:gen_eim_configuration_data(request)},
 		  {eimConfigurationData, eim_cfg:gen_eim_configuration_data(single)},
-		  {counterValue, CounterValue}
+		  {counterValue, CounterValue},
+		  {consumerEuicc, ConsumerEuicc}
 		]},
     InfoListJson = utils:join_binary_list(jiffy:encode(InfoList)),
     Response = io_lib:format("~s", [binary_to_list(InfoListJson)]),
