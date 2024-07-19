@@ -9,6 +9,14 @@
 -define(RESPONSE_HEADERS, #{<<"content-type">> => <<"application/x-gsma-rsp-asn1">>,
 			    <<"x-admin-protocol">> => <<"gsma/rsp/v2.1.0">>}).
 
+% Helper function to send out a list of notifications
+handle_asn1_notificationList(_Req0, _State, []) ->
+    ok;
+handle_asn1_notificationList(Req0, State, NotificationList) ->
+    [PendingNotification | NotificationListTail] = NotificationList,
+    handle_asn1(Req0, State, {handleNotificationEsipa, {pendingNotification, PendingNotification}}),
+    handle_asn1_notificationList(Req0, State, NotificationListTail).
+
 %GSMA SGP.32, section 6.3.2.1
 handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
     {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
@@ -298,12 +306,25 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
 	{euiccPackageResult, EuiccPackageResult} ->
 	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
 	{ePRAndNotifications, EPRAndNotifications} ->
-	    % TODO: Do something useful with the notificationList, that is also included in this response. What we
-	    % could do is crafting a suitable data structure for each of the notifications and then call
-	    % handle_asn1(Req0, State, {handleNotificationEsipa, CraftedEsipaReq}) in a loop for each of the
-	    % notifications.
+	    % Handle the euiccPackageResult first,
 	    EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
-	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq);
+	    ok = esipa_asn1_handler_utils:handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq),
+	    % then forward the notifications in the included notification list
+	    RetrieveNotificationsListResponse = maps:get(notificationList, EPRAndNotifications),
+	    case RetrieveNotificationsListResponse of
+		{notificationList, NotificationList} ->
+		    handle_asn1_notificationList(Req0, _State, NotificationList);
+		{notificationsListResultError, NotificationsListResultError} ->
+		    logger:notice("Ipad is reporting a problem to retrieve notifications,~nNotificationsListResultError=~p,~nPid=~p~n",
+				  [NotificationsListResultError, maps:get(pid, Req0)]);
+		UnhandledObject ->
+		    % TODO: The RetrieveNotificationsListResponse may also contain other objects, in particular
+		    % euiccPackageResultList and notificationAndEprList, which again includes either a
+		    % notificationList or an euiccPackageResultList The spec is a bit unclear on how exactly and when
+		    % those data objects shall be used, so we ignore them for now and display a notice in the log
+		    logger:notice("RetrieveNotificationsListResponse with unhandled object,~UnhandledObject=~p,~nPid=~p~n",
+				  [UnhandledObject, maps:get(pid, Req0)])
+	    end;
 	{ipaEuiccDataResponse, IpaEuiccDataResponse} ->
 	    % drive-by store the eUICC public key so that we can use it later to sign PSMOs or eCOs
 	    {EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
