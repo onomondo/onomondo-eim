@@ -259,7 +259,6 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			    _ ->
 				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned,
 										    utils:binary_to_hex(EidValue)),
-				mnesia_db:work_update(maps:get(pid, Req0), #{eimSignature => EimSignature}),
 				{euiccPackageRequest,
 				 #{euiccPackageSigned => EuiccPackageSigned,
 				   eimSignature => EimSignature}}
@@ -277,7 +276,6 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
 			    _ ->
 				EimSignature = crypto_utils:sign_euiccPackageSigned(EuiccPackageSigned,
 										    utils:binary_to_hex(EidValue)),
-				mnesia_db:work_update(maps:get(pid, Req0), #{eimSignature => EimSignature}),
 				{euiccPackageRequest,
 				 #{euiccPackageSigned => EuiccPackageSigned,
 				   eimSignature => EimSignature}}

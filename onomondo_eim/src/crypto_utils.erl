@@ -6,7 +6,7 @@
 -module(crypto_utils).
 
 -export([sign_euiccPackageSigned/2,
-	 verify_euiccPackageResultSigned/3,
+	 verify_euiccPackageResultSigned/2,
 	 store_euicc_pubkey_from_authenticateResponseOk/2,
 	 store_euicc_pubkey_from_ipaEuiccDataResponse/2]).
 
@@ -139,10 +139,16 @@ verify_experiment2() ->
     MessageHex = <<EuiccPackageResultDataSignedHex/binary, EimSignatureHex/binary>>,
     verify_signature(utils:hex_to_binary(MessageHex), utils:hex_to_binary(EuiccSignEPRHex), <<89044045118427484800000000011628>>).
 
-verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
+verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) ->
     {ok, ConsumerEuicc} = mnesia_db:euicc_param_get(EidValue, consumerEuicc),
     case ConsumerEuicc of
 	false ->
+	    % Read the AssociationToken
+	    {ok, AssociationToken} = mnesia_db:euicc_param_get(EidValue, associationToken),
+	    AssociationTokenBinary = utils:integer_to_bytes(AssociationToken),
+	    AssociationTokenLength = utils:integer_to_bytes(byte_size(AssociationTokenBinary)),
+	    AssociationTokenBer =  utils:join_binary_list([<<132>>, AssociationTokenLength, AssociationTokenBinary]),
+
 	    case EuiccPackageResult of
 		{euiccPackageResultSigned, EuiccPackageResultSigned} ->
 		    EuiccPackageResultDataSigned = maps:get(euiccPackageResultDataSigned, EuiccPackageResultSigned),
@@ -151,7 +157,7 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
 										       EuiccPackageResultDataSigned),
 		    % "euiccSignEPR SHALL apply on the concatenated data objects euiccPackageResultDataSigned and
 		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
-		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageResultDataSigned_enc, EimSignature]),
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageResultDataSigned_enc, AssociationTokenBer]),
 		    verify_signature(MsgToBeVerfied, EuiccSignEPR, EidValue);
 		{euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
 		    EuiccPackageErrorDataSigned = maps:get(euiccPackageErrorDataSigned, EuiccPackageErrorSigned),
@@ -160,7 +166,7 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
 										      EuiccPackageErrorDataSigned),
 		    % "euiccSignEPE SHALL apply on the concatenated data objects euiccPackageErrorDataSigned and
 		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
-		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageErrorDataSigned_enc, EimSignature]),
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageErrorDataSigned_enc, AssociationTokenBer]),
 		    verify_signature(MsgToBeVerfied, EuiccSignEPE, EidValue);
 		{euiccPackageErrorUnsigned, _} ->
 		    ok; % This result has no signature

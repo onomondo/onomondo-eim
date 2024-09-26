@@ -70,9 +70,8 @@ process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId) ->
 % signature checks and the generation of an appropriate outcome for the REST API.
 handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq) ->
     TransactionId = transactionId_from_euiccPackageResult(EuiccPackageResult),
-    {EidValue, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
-    EimSignature = maps:get(eimSignature, WorkState),
-    case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) of
+    {EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+    case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) of
 	ok ->
 	    process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId);
 	_ ->
