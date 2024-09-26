@@ -155,7 +155,7 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EimSignature, EidValue) ->
 		    verify_signature(MsgToBeVerfied, EuiccSignEPR, EidValue);
 		{euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
 		    EuiccPackageErrorDataSigned = maps:get(euiccPackageErrorDataSigned, EuiccPackageErrorSigned),
-		    EuiccSignEPE = maps:get(euiccSignEPR, EuiccPackageErrorSigned),
+		    EuiccSignEPE = maps:get(euiccSignEPE, EuiccPackageErrorSigned),
 		    {ok, EuiccPackageErrorDataSigned_enc} = 'SGP32Definitions':encode('EuiccPackageErrorDataSigned',
 										      EuiccPackageErrorDataSigned),
 		    % "euiccSignEPE SHALL apply on the concatenated data objects euiccPackageErrorDataSigned and
