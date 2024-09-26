@@ -25,16 +25,20 @@ plain_to_der(PlainSignature) ->
     {ok, DERSignatureEncoded} = 'DERSignature':encode('DERSignature', DERSignature),
     DERSignatureEncoded.
 
+%Encode the association token as BER TLV IE
+enc_association_token(AssociationToken) ->
+    %TODO: replace this with a proper ASN.1 encoding function.
+    AssociationTokenBinary = utils:integer_to_bytes(AssociationToken),
+    AssociationTokenLength = utils:integer_to_bytes(byte_size(AssociationTokenBinary)),
+    utils:join_binary_list([<<132>>, AssociationTokenLength, AssociationTokenBinary]).
+
 sign_euiccPackageSigned(EuiccPackageSigned, EidValue) ->
     % Read the AssociationToken
     {ok, AssociationToken} = mnesia_db:euicc_param_get(EidValue, associationToken),
-    AssociationTokenBinary = utils:integer_to_bytes(AssociationToken),
-    AssociationTokenLength = utils:integer_to_bytes(byte_size(AssociationTokenBinary)),
-    AssociationTokenBer =  utils:join_binary_list([<<132>>, AssociationTokenLength, AssociationTokenBinary]),
 
     %Format message to be signed
     {ok, EuiccPackageSignedEnc} = 'SGP32Definitions':encode('EuiccPackageSigned', EuiccPackageSigned),
-    MsgToBeSigned = utils:join_binary_list([EuiccPackageSignedEnc, AssociationTokenBer]),
+    MsgToBeSigned = utils:join_binary_list([EuiccPackageSignedEnc, enc_association_token(AssociationToken)]),
 
     %Load private key from eIM certificate
     {ok, EimKeyPath} = application:get_env(onomondo_eim, eim_key),
@@ -91,9 +95,6 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) ->
 	false ->
 	    % Read the AssociationToken
 	    {ok, AssociationToken} = mnesia_db:euicc_param_get(EidValue, associationToken),
-	    AssociationTokenBinary = utils:integer_to_bytes(AssociationToken),
-	    AssociationTokenLength = utils:integer_to_bytes(byte_size(AssociationTokenBinary)),
-	    AssociationTokenBer =  utils:join_binary_list([<<132>>, AssociationTokenLength, AssociationTokenBinary]),
 
 	    case EuiccPackageResult of
 		{euiccPackageResultSigned, EuiccPackageResultSigned} ->
@@ -103,7 +104,8 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) ->
 										       EuiccPackageResultDataSigned),
 		    % "euiccSignEPR SHALL apply on the concatenated data objects euiccPackageResultDataSigned and
 		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
-		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageResultDataSigned_enc, AssociationTokenBer]),
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageResultDataSigned_enc,
+							     enc_association_token(AssociationToken)]),
 		    verify_signature(MsgToBeVerfied, EuiccSignEPR, EidValue);
 		{euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
 		    EuiccPackageErrorDataSigned = maps:get(euiccPackageErrorDataSigned, EuiccPackageErrorSigned),
@@ -112,7 +114,8 @@ verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) ->
 										      EuiccPackageErrorDataSigned),
 		    % "euiccSignEPE SHALL apply on the concatenated data objects euiccPackageErrorDataSigned and
 		    % eimSignature." (see also GSMA SGP.32, section 2.11.2.1)
-		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageErrorDataSigned_enc, AssociationTokenBer]),
+		    MsgToBeVerfied = utils:join_binary_list([EuiccPackageErrorDataSigned_enc,
+							     enc_association_token(AssociationToken)]),
 		    verify_signature(MsgToBeVerfied, EuiccSignEPE, EidValue);
 		{euiccPackageErrorUnsigned, _} ->
 		    ok; % This result has no signature
