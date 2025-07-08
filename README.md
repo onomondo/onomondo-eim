@@ -1,4 +1,4 @@
-﻿# onomondo-eim
+﻿# Onomondo eIM
 onomondo-eim is an erlang based eIM (Remote provisioning and management of the eUICC in IoT Devices, see also SGP.31)
 implementation. Besides an ES9+ (SMDP+) and an ESipa (IPAd) interface it also features a REST API that allows an API
 user to perform management tasks on the eUICC (profile download, execution of PSMOs, eCOs and eUICC data requests).
@@ -11,7 +11,7 @@ Interfaces
 The ESipa interface of onomondo-eim is implemented as an HTTP server interface (see also GSMA SGP.32, section 6.1) that
 uses ASN.1 function bindings (see also GSMA SGP.32, section 6.3. The HTTP client (IPAd) on the remote end is expected to
 establish the connection with the ESipa.GetEimPackage request and keep it open at least until the related procedure
-ends with the ESipa.HandleNotifiations request (see also GSMA SGP.32, section 3.1.1.1, figure 5)
+ends with the ESipa.HandleNotifications request (see also GSMA SGP.32, section 3.1.1.1, figure 5)
 
 ### ES9+
 
@@ -372,7 +372,7 @@ interface.
 
 * `resourceId`: the `resourceId` used to identify REST resources. The database automatically assigns a unique
   `resourceId` and returns it to the REST API user.
-* `facility`: defines the `facilitiy` to which the REST resource is associated.
+* `facility`: defines the `facility` to which the REST resource is associated.
 * `eidValue`: contains the `EID` of the eUICC to which the `order` is associated.
 * `order`: the specific `order` that the REST API has submitted
 * `status`: overall status of the order (can be `new`, `work` or `done`)
@@ -428,7 +428,7 @@ The `work` table maintains the following columns:
 
 * `pid`: contains the erlang process id of the HTTP server child process
 * `resourceId`: the `resourceId` of the related REST resource in the rest table.
-* `transactionId`: the `transactioId` of the ESipa request
+* `transactionId`: the `transactionId` of the ESipa request
 * `eidValue`: the EID of the related eUICC
 * `order`: a copy of the `order` from the `rest` table
 * `state`: a procedure specific state (not to be confused with the `status` column of the `rest` table)
@@ -456,7 +456,7 @@ This is why the REST API allows to modify the contents of the `euicc` table via 
 The `euicc` table maintains the following columns:
 
 * `eidValue`: the EID of the related eUICC
-* `counterValue`: the conter value that is used when signing eUICC packages
+* `counterValue`: the counter value that is used when signing eUICC packages
 * `consumerEuicc`: a flag to tell the eIM that the eUICC on the remote end is a consumer eUICC using an IoT eUICC
 emulation mode.
 * `associationToken`: an integer number to associate an eIM configuration on the eUICC with this eIM
@@ -607,7 +607,7 @@ The eUICC data Request is a special operation, that allows the eIM to request so
 authenticate eCO and PSMO responses. The order takes a `tagList` as input, which describes what kind of data to request.
 The exact meaning of the tags can be found in the aforementioned spec reference.
 
-To perfrm an eUICC data request, execute the following script like so:
+To perform an eUICC data request, execute the following script like so:
 ```
 ./tryme_euiccDataRequest.sh X 12345678900000000000000000001234
 ```
