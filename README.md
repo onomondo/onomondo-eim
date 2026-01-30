@@ -649,3 +649,10 @@ all changes to the `euicc` table are made accordingly, we should get a result li
 
 Now the eIM will treat the eUICC as a native IoT eUICC, a proper public key set and the counter value is high enough
 so that we can sign new eUICC packages correctly.
+
+License
+----------
+
+Copyright (c) 2025 Onomondo ApS & sysmocom - s.f.m.c. GmbH.
+
+Licensed under the GNU Affero General Public License v3.0 only.
