@@ -54,7 +54,7 @@ A typical output after the first startup
 Erlang/OTP 25 [erts-13.1.5] [source] [64-bit] [smp:16:16] [ds:16:16:10] [async-threads:1] [jit:ns]
 
 =NOTICE REPORT==== 18-Jul-2024::11:54:10.513176 ===
-eIM! version:1.0.0
+eIM! version:0.0.1
 
 =INFO REPORT==== 18-Jul-2024::11:54:10.513746 ===
     application: mnesia
