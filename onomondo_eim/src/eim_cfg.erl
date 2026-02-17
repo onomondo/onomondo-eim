@@ -19,36 +19,51 @@ gen_eim_configuration_data(Style) ->
 
     % Check certificate type
     EimCert_algorithm = maps:get(algorithm, EimCert_SubjectPublicKeyInfo),
-    BrainpoolP256r1 = #{algorithm => {1,2,840,10045,2,1},
-                        parameters => <<6,9,43,36,3,3,2,8,1,1,7>>},
-    Prime256v1 = #{algorithm => {1,2,840,10045,2,1},
-		   parameters => <<6,8,42,134,72,206,61,3,1,7>>},
+    BrainpoolP256r1 = #{
+        algorithm => {1, 2, 840, 10045, 2, 1},
+        parameters => <<6, 9, 43, 36, 3, 3, 2, 8, 1, 1, 7>>
+    },
+    Prime256v1 = #{
+        algorithm => {1, 2, 840, 10045, 2, 1},
+        parameters => <<6, 8, 42, 134, 72, 206, 61, 3, 1, 7>>
+    },
     case EimCert_algorithm of
-	BrainpoolP256r1 -> ok;
-	Prime256v1 -> ok;
-	_ ->
-	    throw("Incorrect eIM certificate, only BrainpoolP256r1 or Prime256v1 may be used!")
+        BrainpoolP256r1 -> ok;
+        Prime256v1 -> ok;
+        _ -> throw("Incorrect eIM certificate, only BrainpoolP256r1 or Prime256v1 may be used!")
     end,
 
     % Generate eIM configuration
     EimFqdn = string:join([inet:ntoa(EsipaIp), io_lib:format(":~B", [EsipaPort])], ""),
-    EimConfigurationData = #{eimId => EimId, % Mandatory
-			     eimFqdn => EimFqdn, % Optional, but necessary to access the eIM
-			     counterValue => CounterValue, % Mandatory
-			     associationToken => -1, %Optional: instruct the eUICC to calculate an association token
-			     eimPublicKeyData => {eimPublicKey, EimCert_SubjectPublicKeyInfo}}, % Mandatory
+    % Mandatory
+    EimConfigurationData = #{
+        eimId => EimId,
+        % Optional, but necessary to access the eIM
+        eimFqdn => EimFqdn,
+        % Mandatory
+        counterValue => CounterValue,
+        %Optional: instruct the eUICC to calculate an association token
+        associationToken => -1,
+        % Mandatory
+        eimPublicKeyData => {eimPublicKey, EimCert_SubjectPublicKeyInfo}
+    },
     EimConfigurationDataList = [EimConfigurationData],
-    AddInitialEimRequest =  #{eimConfigurationDataList => EimConfigurationDataList},
+    AddInitialEimRequest = #{eimConfigurationDataList => EimConfigurationDataList},
 
-    Encoded = case Style of
-		  request ->
-		      % Formatted as AddInitialEimRequest
-		      {ok, Asn1Encoded} = 'SGP32Definitions':encode('AddInitialEimRequest',
-								    AddInitialEimRequest),
-		     Asn1Encoded;
-		  single ->
-		      % Formatted as EimConfigurationData only
-		      {ok, Asn1Encoded} = 'SGP32Definitions':encode('EimConfigurationData', EimConfigurationData),
-		      Asn1Encoded
-	     end,
+    Encoded =
+        case Style of
+            request ->
+                % Formatted as AddInitialEimRequest
+                {ok, Asn1Encoded} = 'SGP32Definitions':encode(
+                    'AddInitialEimRequest',
+                    AddInitialEimRequest
+                ),
+                Asn1Encoded;
+            single ->
+                % Formatted as EimConfigurationData only
+                {ok, Asn1Encoded} = 'SGP32Definitions':encode(
+                    'EimConfigurationData', EimConfigurationData
+                ),
+                Asn1Encoded
+        end,
     utils:binary_to_hex(Encoded).

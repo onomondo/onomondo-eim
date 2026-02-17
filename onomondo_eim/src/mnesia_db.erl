@@ -21,26 +21,32 @@
 % trigger recurring events (called automatically by timer from this module)
 -export([cleanup/0, euicc_setparam/0]).
 
--record(rest, {resourceId :: binary(),
-	       facility :: atom(),
-	       eidValue :: binary(),
-	       order :: binary(),
-	       status :: atom(),
-	       timestamp :: integer(),
-	       outcome :: binary(),
-	       debuginfo :: binary()}).
--record(work, {pid :: pid(),
-	       resourceId :: binary(),
-	       transactionId :: binary(),
-	       eidValue :: binary(),
-	       order :: binary(),
-	       state :: binary()}).
--record(euicc, {eidValue :: binary(),
-		counterValue :: integer(),
-		consumerEuicc :: boolean(),
-		associationToken :: integer(),
-		signPubKey :: binary(),
-		signAlgo :: binary()}).
+-record(rest, {
+    resourceId :: binary(),
+    facility :: atom(),
+    eidValue :: binary(),
+    order :: binary(),
+    status :: atom(),
+    timestamp :: integer(),
+    outcome :: binary(),
+    debuginfo :: binary()
+}).
+-record(work, {
+    pid :: pid(),
+    resourceId :: binary(),
+    transactionId :: binary(),
+    eidValue :: binary(),
+    order :: binary(),
+    state :: binary()
+}).
+-record(euicc, {
+    eidValue :: binary(),
+    counterValue :: integer(),
+    consumerEuicc :: boolean(),
+    associationToken :: integer(),
+    signPubKey :: binary(),
+    signAlgo :: binary()
+}).
 
 % Caution: The status (atom) must be either "new", "work", or "done"
 
@@ -50,88 +56,110 @@ trans_rest_set_status(ResourceId, Status, Outcome, Debuginfo) ->
     Rows = qlc:e(Q),
     Timestamp = os:system_time(seconds),
     case Rows of
-	[Row | []] ->
-	    mnesia:write(Row#rest{status=Status, timestamp=Timestamp, outcome=Outcome, debuginfo=Debuginfo}),
-	    ok;
-	[] ->
-	    error;
-	_ ->
-	    error
+        [Row | []] ->
+            mnesia:write(Row#rest{
+                status = Status, timestamp = Timestamp, outcome = Outcome, debuginfo = Debuginfo
+            }),
+            ok;
+        [] ->
+            error;
+        _ ->
+            error
     end.
 
 % Initialize databse scheme, tables and check the database for unfinished orders
 init() ->
-
     % Create an initial mnesia scheme.
     mnesia:stop(),
     case mnesia:create_schema([node()]) of
-	{error, {_, {already_exists, _}}} ->
-	    ok;
-	ok ->
-	    logger:notice("    mnesia database schema created\n")
+        {error, {_, {already_exists, _}}} ->
+            ok;
+        ok ->
+            logger:notice("    mnesia database schema created\n")
     end,
     ok = mnesia:start(),
     logger:notice("    mnesia started\n"),
 
     % The rest table is a persistent table, so even after a crash it will be possible to continue pending orders.
-    case mnesia:create_table(rest,
-			     [{attributes, record_info(fields, rest)},
-			      {disc_copies, [node()]},
-			      {type, set}
-			     ]) of
-	{aborted, {already_exists, rest}} ->
-	    ok;
-	{atomic, ok} ->
-	    logger:notice("    rest table created\n")
+    case
+        mnesia:create_table(
+            rest,
+            [
+                {attributes, record_info(fields, rest)},
+                {disc_copies, [node()]},
+                {type, set}
+            ]
+        )
+    of
+        {aborted, {already_exists, rest}} ->
+            ok;
+        {atomic, ok} ->
+            logger:notice("    rest table created\n")
     end,
 
     % The work table is volatile. It only contains intermediate results. When the eIM is restarted and there is a
     % pending order that is worked on. Then all the work is lost. This is intentional since we want to avoid keeping
     % states that have gotten inconsistent anyway.
-    case mnesia:create_table(work,
-			     [{attributes, record_info(fields, work)},
-			      {type, set}
-			     ]) of
-	{aborted, {already_exists, work}} ->
-	    ok;
-	{atomic, ok} ->
-	    logger:notice("    work table created\n")
+    case
+        mnesia:create_table(
+            work,
+            [
+                {attributes, record_info(fields, work)},
+                {type, set}
+            ]
+        )
+    of
+        {aborted, {already_exists, work}} ->
+            ok;
+        {atomic, ok} ->
+            logger:notice("    work table created\n")
     end,
 
     % The euicc table will store the eUICC master data, such as the eID and the counterValue that is required for
     % the replay protection.
-    case mnesia:create_table(euicc,
-			     [{attributes, record_info(fields, euicc)},
-			      {disc_copies, [node()]},
-			      {type, set}
-			     ]) of
-	{aborted, {already_exists, euicc}} ->
-	    ok;
-	{atomic, ok} ->
-	    logger:notice("    euicc table created\n")
+    case
+        mnesia:create_table(
+            euicc,
+            [
+                {attributes, record_info(fields, euicc)},
+                {disc_copies, [node()]},
+                {type, set}
+            ]
+        )
+    of
+        {aborted, {already_exists, euicc}} ->
+            ok;
+        {atomic, ok} ->
+            logger:notice("    euicc table created\n")
     end,
 
     % Wait until the mnesia tables become available.
     case mnesia:wait_for_tables([rest, work], 60000) of
-	{timeout, _} ->
-	    logger:error("    unable to synchronize mnesia tables\n"),
-	    throw("normal operation not possible");
-	ok ->
-	    ok
+        {timeout, _} ->
+            logger:error("    unable to synchronize mnesia tables\n"),
+            throw("normal operation not possible");
+        ok ->
+            ok
     end,
 
     % Look through the rest table and mark all items that were in state "work" as "done" and put an appropriate outcome
     % into the rest table. This way we tell the REST API user that the processing of the order was interrupted due to a
     % crash/restart of the eIM. The API user is then expected to delete the item and (if necessary) re-submit the order.
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work]),
-		    ResourceIds = qlc:e(Q),
-		    lists:foreach(fun(ResourceId) ->
-					  trans_rest_set_status(ResourceId, done,
-								[{[{procedureError, abortedOrder}]}], none)
-				  end,
-				  ResourceIds)
-	    end,
+        Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.status == work]),
+        ResourceIds = qlc:e(Q),
+        lists:foreach(
+            fun(ResourceId) ->
+                trans_rest_set_status(
+                    ResourceId,
+                    done,
+                    [{[{procedureError, abortedOrder}]}],
+                    none
+                )
+            end,
+            ResourceIds
+        )
+    end,
     {atomic, ok} = mnesia:transaction(Trans),
 
     % Start recurring event cycles
@@ -145,78 +173,101 @@ rest_create(Facility, EidValue, Order) ->
     ok = euicc_create_if_not_exist(EidValue),
     ResourceId = uuid:uuid_to_string(uuid:get_v4_urandom()),
     Timestamp = os:system_time(seconds),
-    Row = #rest{resourceId=ResourceId, facility=Facility, eidValue=EidValue, order=Order, status=new,
-		timestamp=Timestamp, outcome=[], debuginfo=none},
+    Row = #rest{
+        resourceId = ResourceId,
+        facility = Facility,
+        eidValue = EidValue,
+        order = Order,
+        status = new,
+        timestamp = Timestamp,
+        outcome = [],
+        debuginfo = none
+    },
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.resourceId == ResourceId]),
-		    Present = qlc:e(Q),
-		    case Present of
-			[] ->
-			    mnesia:write(Row);
-			_ ->
-			    error
-		    end
-	    end,
+        Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.resourceId == ResourceId]),
+        Present = qlc:e(Q),
+        case Present of
+            [] ->
+                mnesia:write(Row);
+            _ ->
+                error
+        end
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     {Result, ResourceId}.
 
 % Lookup REST resource (order)
 rest_lookup(ResourceId, Facility) ->
     Trans = fun() ->
-		    Q = qlc:q([{X#rest.status, X#rest.timestamp, X#rest.eidValue,
-				X#rest.order, X#rest.outcome, X#rest.debuginfo} ||
-				  X <- mnesia:table(rest),
-				  X#rest.resourceId == ResourceId, X#rest.facility == Facility]),
-		    qlc:e(Q)
-	    end,
+        Q = qlc:q([
+            {
+                X#rest.status,
+                X#rest.timestamp,
+                X#rest.eidValue,
+                X#rest.order,
+                X#rest.outcome,
+                X#rest.debuginfo
+            }
+         || X <- mnesia:table(rest),
+            X#rest.resourceId == ResourceId,
+            X#rest.facility == Facility
+        ]),
+        qlc:e(Q)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
-	[{Status, Timestamp, EidValue, Order, Outcome, Debuginfo}] ->
-	    {Status, Timestamp, EidValue, Order, Outcome, Debuginfo};
-	[] ->
-	    none;
-	_ ->
-	    error
+        [{Status, Timestamp, EidValue, Order, Outcome, Debuginfo}] ->
+            {Status, Timestamp, EidValue, Order, Outcome, Debuginfo};
+        [] ->
+            none;
+        _ ->
+            error
     end.
 
 % Delete REST resource (order)
 rest_delete(ResourceId, Facility) ->
     Trans = fun() ->
-		    QRest = qlc:q([X#rest.resourceId ||
-				  X <- mnesia:table(rest),
-				  X#rest.resourceId == ResourceId, X#rest.facility == Facility]),
-		    RestPresent = qlc:e(QRest),
-		    case RestPresent of
-			[] ->
-			    none;
-			_ ->
-			    OidRest = {rest, ResourceId},
-			    ok = mnesia:delete(OidRest),
+        QRest = qlc:q([
+            X#rest.resourceId
+         || X <- mnesia:table(rest),
+            X#rest.resourceId == ResourceId,
+            X#rest.facility == Facility
+        ]),
+        RestPresent = qlc:e(QRest),
+        case RestPresent of
+            [] ->
+                none;
+            _ ->
+                OidRest = {rest, ResourceId},
+                ok = mnesia:delete(OidRest),
 
-			    % There may be an orphaned work item now, which we must also remove. This will also kill
-			    % the order in case it is currently in progress.
-			    QWork = qlc:q([X#work.pid || X <- mnesia:table(work), X#work.resourceId == ResourceId]),
-			    WorkPresent = qlc:e(QWork),
-			    case WorkPresent of
-				[] ->
-				    ok;
-				[Pid] ->
-				    OidWork = {work, Pid},
-				    mnesia:delete(OidWork);
-				_ ->
-				    error
-			    end
-		    end
-	    end,
+                % There may be an orphaned work item now, which we must also remove. This will also kill
+                % the order in case it is currently in progress.
+                QWork = qlc:q([
+                    X#work.pid
+                 || X <- mnesia:table(work), X#work.resourceId == ResourceId
+                ]),
+                WorkPresent = qlc:e(QWork),
+                case WorkPresent of
+                    [] ->
+                        ok;
+                    [Pid] ->
+                        OidWork = {work, Pid},
+                        mnesia:delete(OidWork);
+                    _ ->
+                        error
+                end
+        end
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
 
 % List the resource identifiers of currently present REST resources
 rest_list(Facility) ->
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.facility == Facility]),
-		    qlc:e(Q)
-	    end,
+        Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest), X#rest.facility == Facility]),
+        qlc:e(Q)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
 
@@ -227,63 +278,78 @@ work_fetch(EidValue, Pid) ->
     % item can be processed. If there is already a pending work item under the given PID, forcefully finish this work
     % item.
     TransPidExists = fun() ->
-			     Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
-			     WorkPresent = qlc:e(Q),
-			     case WorkPresent of
-				 [] ->
-				     false;
-				 _ ->
-				     true
-			     end
-		     end,
+        Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
+        WorkPresent = qlc:e(Q),
+        case WorkPresent of
+            [] ->
+                false;
+            _ ->
+                true
+        end
+    end,
 
     {atomic, PidExists} = mnesia:transaction(TransPidExists),
     case PidExists of
-	true ->
-	    work_finish(Pid, [{[{procedureError, stuckOrder}]}], none);
-	false ->
-	    ok
+        true ->
+            work_finish(Pid, [{[{procedureError, stuckOrder}]}], none);
+        false ->
+            ok
     end,
 
     % Read the next pending REST resource from the rest table and create a related work item. The work item is then
     % in progress.
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(rest),
-				    X#rest.eidValue == EidValue, X#rest.status == new, X#rest.facility =/= euicc]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[Row | _] ->
-			    % Create an entry in the work table
-			    WorkRow = #work{pid=Pid, resourceId=Row#rest.resourceId, transactionId=none,
-					    eidValue=Row#rest.eidValue, order=Row#rest.order, state=none},
-			    case mnesia:write(WorkRow) of
-				ok ->
-				    % We are now working on this order
-				    ok = trans_rest_set_status(Row#rest.resourceId, work, [], none),
-				    Row;
-				_ ->
-				    error
-			    end;
-			[] ->
-			    none;
-			_ ->
-			    error
-		    end
-	    end,
+        Q = qlc:q([
+            X
+         || X <- mnesia:table(rest),
+            X#rest.eidValue == EidValue,
+            X#rest.status == new,
+            X#rest.facility =/= euicc
+        ]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                % Create an entry in the work table
+                WorkRow = #work{
+                    pid = Pid,
+                    resourceId = Row#rest.resourceId,
+                    transactionId = none,
+                    eidValue = Row#rest.eidValue,
+                    order = Row#rest.order,
+                    state = none
+                },
+                case mnesia:write(WorkRow) of
+                    ok ->
+                        % We are now working on this order
+                        ok = trans_rest_set_status(Row#rest.resourceId, work, [], none),
+                        Row;
+                    _ ->
+                        error
+                end;
+            [] ->
+                none;
+            _ ->
+                error
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
-	{rest, _, Facility, _, Order, _, _, _, _} ->
-	    logger:info("Work: fetching new work item,~nEidValue=~p, Pid=~p, Facility=~p,~nOrder=~p~n",
-			  [EidValue, Pid, Facility, Order]),
-	    {Facility, Order};
-	none ->
-	    logger:info("Work: no work item in database,~nEidValue=~p, Pid=~p~n", [EidValue, Pid]),
-	    none;
-	_ ->
-	    logger:error("Work: cannot fetch work item, database error,~nEidValue=~p, Pid=~p~n", [EidValue, Pid]),
-	    error
-	end.
+        {rest, _, Facility, _, Order, _, _, _, _} ->
+            logger:info(
+                "Work: fetching new work item,~nEidValue=~p, Pid=~p, Facility=~p,~nOrder=~p~n",
+                [EidValue, Pid, Facility, Order]
+            ),
+            {Facility, Order};
+        none ->
+            logger:info("Work: no work item in database,~nEidValue=~p, Pid=~p~n", [EidValue, Pid]),
+            none;
+        _ ->
+            logger:error("Work: cannot fetch work item, database error,~nEidValue=~p, Pid=~p~n", [
+                EidValue, Pid
+            ]),
+            error
+    end.
 
 % Bind a work item to a TransactionId. The transactionId has to be a unique identifier that can be used as a secondary
 % key to find a work item in the databse. The binding works in two directions. The work item is first searched by its
@@ -294,208 +360,233 @@ work_bind(Pid, TransactionId) ->
     % Transaction to update the TransactionId. This is the normal case. A work item starts without having a
     % TransactionId assigned. As soon as a (new) TransactionId becomes known, it is updated using this Transaction.
     TransUpdateTrnsId = fun() ->
-				Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
-				Rows = qlc:e(Q),
-				case Rows of
-				    [Row | _] ->
-					mnesia:write(Row#work{transactionId=TransactionId});
-				    [] ->
-					none;
-				    _ ->
-					error
-				end
-			end,
+        Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                mnesia:write(Row#work{transactionId = TransactionId});
+            [] ->
+                none;
+            _ ->
+                error
+        end
+    end,
 
     % Transaction to update the PID. This is a corner case that comes into play in case the PID is lost (the
     % process/connection handling this work item has died). We then try to find the work item by the TransactionId
     % and update its PID.
     TransUpdatePid = fun() ->
-			     Q = qlc:q([X || X <- mnesia:table(work), X#work.transactionId == TransactionId]),
-			     Rows = qlc:e(Q),
-			     case Rows of
-				 [Row | _] ->
-				     mnesia:write(Row#work{pid=Pid});
-				 [] ->
-				     none;
-				 _ ->
-				     error
-			     end
-		     end,
+        Q = qlc:q([X || X <- mnesia:table(work), X#work.transactionId == TransactionId]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                mnesia:write(Row#work{pid = Pid});
+            [] ->
+                none;
+            _ ->
+                error
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(TransUpdateTrnsId),
     case Result of
         ok ->
-	    logger:info("Work: bound work item to transactionId,~nPid=~p, TransactionId=~p~n", [Pid, TransactionId]),
-	    ok;
-	none ->
-	    {atomic, UpdatePidResult} = mnesia:transaction(TransUpdatePid),
-	    case UpdatePidResult of
-		ok ->
-		    logger:info("Work: bound work item to PID,~nPid=~p, TransactionId=~p~n", [Pid, TransactionId]),
-		    ok;
-		none ->
-		    logger:error("Work: cannot bind work item, transactionId nor PID found,~nPid=~p, TransactionId=~p~n",
-				 [Pid, TransactionId]),
-		    error;
-		_ ->
-		    logger:error("Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdatePid~n",
-				 [Pid, TransactionId]),
-		    error
-	    end;
-	_ ->
-	    logger:error("Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdateTrnsId~n",
-			 [Pid, TransactionId]),
-	    error
+            logger:info("Work: bound work item to transactionId,~nPid=~p, TransactionId=~p~n", [
+                Pid, TransactionId
+            ]),
+            ok;
+        none ->
+            {atomic, UpdatePidResult} = mnesia:transaction(TransUpdatePid),
+            case UpdatePidResult of
+                ok ->
+                    logger:info("Work: bound work item to PID,~nPid=~p, TransactionId=~p~n", [
+                        Pid, TransactionId
+                    ]),
+                    ok;
+                none ->
+                    logger:error(
+                        "Work: cannot bind work item, transactionId nor PID found,~nPid=~p, TransactionId=~p~n",
+                        [Pid, TransactionId]
+                    ),
+                    error;
+                _ ->
+                    logger:error(
+                        "Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdatePid~n",
+                        [Pid, TransactionId]
+                    ),
+                    error
+            end;
+        _ ->
+            logger:error(
+                "Work: cannot bind work item, database error,~nPid=~p, TransactionId=~p, TransUpdateTrnsId~n",
+                [Pid, TransactionId]
+            ),
+            error
     end.
 
 % Pickup a work item that is in progress. This function can be called any time after work_fetch was called
 % before. It can also be called multiple times.
 work_pickup(Pid, TransactionId) ->
     % In case a TransactionId is provied, bind the PID to this TransactionId,
-    WorkBound = case TransactionId of
-	none ->
-	    ok;
-	_ ->
-	    work_bind(Pid, TransactionId)
-    end,
+    WorkBound =
+        case TransactionId of
+            none ->
+                ok;
+            _ ->
+                work_bind(Pid, TransactionId)
+        end,
 
     % Lookup the work state by the given PID
     case WorkBound of
-	ok ->
-	    Trans = fun() ->
-			    Q = qlc:q([{X#work.eidValue, X#work.order, X#work.state} ||
-					  X <- mnesia:table(work), X#work.pid == Pid]),
-			    qlc:e(Q)
-		    end,
-	    {atomic, Result} = mnesia:transaction(Trans),
-	    case Result of
-		[{EidValue, Order, State} | _] ->
-		    {EidValue, Order, State};
-		[] ->
-		    logger:error("Work: no work item found under specified Pid, already finished?, not fetched?,~nPid=~p~n",
-				 [Pid]),
-		    none;
-		_ ->
-		    logger:error("Work: cannot pick up work item, database error,~nPid=~p~n", [Pid]),
-		    error
-	    end;
-	_ ->
-	    WorkBound
+        ok ->
+            Trans = fun() ->
+                Q = qlc:q([
+                    {X#work.eidValue, X#work.order, X#work.state}
+                 || X <- mnesia:table(work), X#work.pid == Pid
+                ]),
+                qlc:e(Q)
+            end,
+            {atomic, Result} = mnesia:transaction(Trans),
+            case Result of
+                [{EidValue, Order, State} | _] ->
+                    {EidValue, Order, State};
+                [] ->
+                    logger:error(
+                        "Work: no work item found under specified Pid, already finished?, not fetched?,~nPid=~p~n",
+                        [Pid]
+                    ),
+                    none;
+                _ ->
+                    logger:error("Work: cannot pick up work item, database error,~nPid=~p~n", [Pid]),
+                    error
+            end;
+        _ ->
+            WorkBound
     end.
 
 % Update a work item that is in progress. This fuction updates the state (any user defined term) of the work item.
 % This function can be called any time after work_fetch was called before. It can also be called multiple times.
 work_update(Pid, State) ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[Row | _] ->
-			    mnesia:write(Row#work{state=State});
-			[] ->
-			    error;
-			_ ->
-			    error
-		    end
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(work), X#work.pid == Pid]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                mnesia:write(Row#work{state = State});
+            [] ->
+                error;
+            _ ->
+                error
+        end
+    end,
 
-    {atomic , Result} = mnesia:transaction(Trans),
+    {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:info("Work: updating work item,~nPid=~p, State=~p~n", [Pid, State]),
-	    ok;
-	_ ->
-	    logger:error("Work: cannot update, database error,~nPid=~p, State=~p~n", [Pid, State]),
-	    error
+            logger:info("Work: updating work item,~nPid=~p, State=~p~n", [Pid, State]),
+            ok;
+        _ ->
+            logger:error("Work: cannot update, database error,~nPid=~p, State=~p~n", [Pid, State]),
+            error
     end.
 
 % Finish an order that has been worked on. This removes the related entry from the work table and sets the status in
 % the rest table to "done".
 work_finish(Pid, Outcome, Debuginfo) ->
     Trans = fun() ->
-		    Q = qlc:q([X#work.resourceId || X <- mnesia:table(work), X#work.pid == Pid]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[] ->
-			    error;
-			[ResourceId | _] ->
-			    Oid = {work, Pid},
-			    ok = mnesia:delete(Oid),
-			    ok = trans_rest_set_status(ResourceId, done, Outcome, Debuginfo)
-		    end
-	    end,
+        Q = qlc:q([X#work.resourceId || X <- mnesia:table(work), X#work.pid == Pid]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [] ->
+                error;
+            [ResourceId | _] ->
+                Oid = {work, Pid},
+                ok = mnesia:delete(Oid),
+                ok = trans_rest_set_status(ResourceId, done, Outcome, Debuginfo)
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:info("Work: finishing work item,~nPid=~p, Outcome=~p~n", [Pid, Outcome]),
-	    ok;
-	_ ->
-	    logger:error("Work: cannot finish work item, database error,~nPid=~p, Outcome=~p~n",
-			 [Pid, Outcome]),
-	    error
-	end.
+            logger:info("Work: finishing work item,~nPid=~p, Outcome=~p~n", [Pid, Outcome]),
+            ok;
+        _ ->
+            logger:error(
+                "Work: cannot finish work item, database error,~nPid=~p, Outcome=~p~n",
+                [Pid, Outcome]
+            ),
+            error
+    end.
 
 trans_euicc_create_if_not_exist(EidValue) ->
     {ok, CounterValue} = application:get_env(onomondo_eim, counter_value),
     {ok, ConsumerEuicc} = application:get_env(onomondo_eim, consumer_euicc),
-    Row = #euicc{eidValue = EidValue,
-		 counterValue = CounterValue,
-		 consumerEuicc = ConsumerEuicc,
-		 associationToken = 1,
-		 signPubKey = <<>>,
-		 signAlgo = <<"prime256v1">>},
+    Row = #euicc{
+        eidValue = EidValue,
+        counterValue = CounterValue,
+        consumerEuicc = ConsumerEuicc,
+        associationToken = 1,
+        signPubKey = <<>>,
+        signAlgo = <<"prime256v1">>
+    },
     Q = qlc:q([X#euicc.eidValue || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
     Present = qlc:e(Q),
     case Present of
-	[] ->
-	    mnesia:write(Row);
-	_ ->
-	    present
+        [] ->
+            mnesia:write(Row);
+        _ ->
+            present
     end.
 
 % Create a new eUICC master data entry
 euicc_create_if_not_exist(EidValue) ->
     Trans = fun() ->
-		    trans_euicc_create_if_not_exist(EidValue)
-	    end,
+        trans_euicc_create_if_not_exist(EidValue)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:info("eUICC: creating new master data entry,~neID=~p~n", [EidValue]),
-	    ok;
-	present ->
-	    ok;
-	_ ->
-	    logger:error("eUICC: cannot create master data entry, database error,~neID=~p~n", [EidValue]),
-	    error
-	end.
+            logger:info("eUICC: creating new master data entry,~neID=~p~n", [EidValue]),
+            ok;
+        present ->
+            ok;
+        _ ->
+            logger:error("eUICC: cannot create master data entry, database error,~neID=~p~n", [
+                EidValue
+            ]),
+            error
+    end.
 
 % get an incremented counterValue (and store the incremented counterValue as the current counterValue)
 euicc_counter_tick(EidValue) ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[Row | _] ->
-			    CounterValue = Row#euicc.counterValue + 1,
-			    ok = mnesia:write(Row#euicc{counterValue=CounterValue}),
-			    {ok, CounterValue};
-			[] ->
-			    error;
-			_ ->
-			    error
-		    end
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                CounterValue = Row#euicc.counterValue + 1,
+                ok = mnesia:write(Row#euicc{counterValue = CounterValue}),
+                {ok, CounterValue};
+            [] ->
+                error;
+            _ ->
+                error
+        end
+    end,
 
-    {atomic , Result} = mnesia:transaction(Trans),
+    {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         {ok, CounterValue} ->
-	    logger:info("eUICC: incrementing counterValue,~neID=~p, counter=~p~n", [EidValue, CounterValue]),
-	    {ok, CounterValue};
-	_ ->
-	    logger:error("eUICC: cannot increment counterValue, database error,~neID=~p~n", [EidValue]),
-	    error
+            logger:info("eUICC: incrementing counterValue,~neID=~p, counter=~p~n", [
+                EidValue, CounterValue
+            ]),
+            {ok, CounterValue};
+        _ ->
+            logger:error("eUICC: cannot increment counterValue, database error,~neID=~p~n", [
+                EidValue
+            ]),
+            error
     end.
 
 %update one specific parameter in the euicc table
@@ -503,78 +594,82 @@ trans_update_euicc_param(EidValue, Name, Value) ->
     Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
     Rows = qlc:e(Q),
     case Rows of
-	[Row | []] ->
-	    case Name of
-		counterValue ->
-		    mnesia:write(Row#euicc{counterValue=Value});
-		consumerEuicc ->
-		    mnesia:write(Row#euicc{consumerEuicc=Value});
-		associationToken ->
-		    mnesia:write(Row#euicc{associationToken=Value});
-		signPubKey ->
-		    mnesia:write(Row#euicc{signPubKey=Value});
-		signAlgo ->
-		    mnesia:write(Row#euicc{signAlgo=Value});
-		_ ->
-		    error
-	    end;
-	[] ->
-	    error;
-	_ ->
-	    error
+        [Row | []] ->
+            case Name of
+                counterValue ->
+                    mnesia:write(Row#euicc{counterValue = Value});
+                consumerEuicc ->
+                    mnesia:write(Row#euicc{consumerEuicc = Value});
+                associationToken ->
+                    mnesia:write(Row#euicc{associationToken = Value});
+                signPubKey ->
+                    mnesia:write(Row#euicc{signPubKey = Value});
+                signAlgo ->
+                    mnesia:write(Row#euicc{signAlgo = Value});
+                _ ->
+                    error
+            end;
+        [] ->
+            error;
+        _ ->
+            error
     end.
 
 % Get an eUICC parameter by its name (atom)
 euicc_param_get(EidValue, Name) ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[Row | _] ->
-			    case Name of
-				counterValue ->
-				    {ok, Row#euicc.counterValue};
-				consumerEuicc ->
-				    {ok, Row#euicc.consumerEuicc};
-				associationToken ->
-				    {ok, Row#euicc.associationToken};
-				signPubKey ->
-				    {ok, Row#euicc.signPubKey};
-				signAlgo ->
-				    {ok, Row#euicc.signAlgo};
-				_ ->
-				    error
-			    end;
-			[] ->
-			    error;
-			_ ->
-			    error
-		    end
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(euicc), X#euicc.eidValue == EidValue]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [Row | _] ->
+                case Name of
+                    counterValue ->
+                        {ok, Row#euicc.counterValue};
+                    consumerEuicc ->
+                        {ok, Row#euicc.consumerEuicc};
+                    associationToken ->
+                        {ok, Row#euicc.associationToken};
+                    signPubKey ->
+                        {ok, Row#euicc.signPubKey};
+                    signAlgo ->
+                        {ok, Row#euicc.signAlgo};
+                    _ ->
+                        error
+                end;
+            [] ->
+                error;
+            _ ->
+                error
+        end
+    end,
 
-    {atomic , Result} = mnesia:transaction(Trans),
+    {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         {ok, Value} ->
-	    logger:info("eUICC: reading eUICC parameter,~neID=~p, name=~p, value=~p~n", [EidValue, Name, Value]),
-	    {ok, Value};
-	_ ->
-	    logger:error("eUICC: cannot read eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
-	    error
+            logger:info("eUICC: reading eUICC parameter,~neID=~p, name=~p, value=~p~n", [
+                EidValue, Name, Value
+            ]),
+            {ok, Value};
+        _ ->
+            logger:error("eUICC: cannot read eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
+            error
     end.
 
 % Update an eUICC parameter by its name (atom)
 euicc_param_set(EidValue, Name, Value) ->
     Trans = fun() ->
-		    trans_update_euicc_param(EidValue, Name, Value)
-	    end,
-    {atomic , Result} = mnesia:transaction(Trans),
+        trans_update_euicc_param(EidValue, Name, Value)
+    end,
+    {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    logger:info("eUICC: writing eUICC parameter,~neID=~p, name=~p, value=~p~n", [EidValue, Name, Value]),
-	    ok;
-	_ ->
-	    logger:error("eUICC: cannot write eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
-	    error
+            logger:info("eUICC: writing eUICC parameter,~neID=~p, name=~p, value=~p~n", [
+                EidValue, Name, Value
+            ]),
+            ok;
+        _ ->
+            logger:error("eUICC: cannot write eUICC parameter,~neID=~p, name=~p~n", [EidValue, Name]),
+            error
     end.
 
 mark_stuck(Timeout) ->
@@ -586,34 +681,38 @@ mark_stuck(Timeout) ->
 
     % Remove Resource from work table and set an appropriate status in the rest table
     HandleResource = fun(ResourceId) ->
-			     % find the pid of the work item that is stuck and then delete it
-			     Q = qlc:q([X#work.pid || X <- mnesia:table(work), X#work.resourceId == ResourceId]),
-			     WorkPresent = qlc:e(Q),
-			     case WorkPresent of
-				 [Pid] ->
-				     Oid = {work, Pid},
-				     ok = mnesia:delete(Oid);
-				 _ ->
-				     ok
-			     end,
+        % find the pid of the work item that is stuck and then delete it
+        Q = qlc:q([X#work.pid || X <- mnesia:table(work), X#work.resourceId == ResourceId]),
+        WorkPresent = qlc:e(Q),
+        case WorkPresent of
+            [Pid] ->
+                Oid = {work, Pid},
+                ok = mnesia:delete(Oid);
+            _ ->
+                ok
+        end,
 
-			     % set status in the rest table
-			     trans_rest_set_status(ResourceId, done, [{[{procedureError, stuckOrder}]}], none)
-		     end,
+        % set status in the rest table
+        trans_rest_set_status(ResourceId, done, [{[{procedureError, stuckOrder}]}], none)
+    end,
 
     % Find all rest resources that stall in status "work" and older than the specified timeout value
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId || X <- mnesia:table(rest),
-						    X#rest.status == work, TimestampNow - X#rest.timestamp > Timeout]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[] ->
-			    ok;
-			Rows ->
-			    [HandleResource(Row) || Row <- Rows],
-			    ok
-		    end
-	    end,
+        Q = qlc:q([
+            X#rest.resourceId
+         || X <- mnesia:table(rest),
+            X#rest.status == work,
+            TimestampNow - X#rest.timestamp > Timeout
+        ]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [] ->
+                ok;
+            Rows ->
+                [HandleResource(Row) || Row <- Rows],
+                ok
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
@@ -627,23 +726,26 @@ mark_noshow(Timeout) ->
 
     % Remove Resource from work table and set an appropriate status in the rest table
     HandleResource = fun(ResourceId) ->
-			     trans_rest_set_status(ResourceId, done, [{[{procedureError, noshowOrder}]}], none)
-		     end,
+        trans_rest_set_status(ResourceId, done, [{[{procedureError, noshowOrder}]}], none)
+    end,
 
     % Find all rest resources that stall in status "work" and older than the specified timeout value
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId ||
-				  X <- mnesia:table(rest), X#rest.status == new,
-				  TimestampNow - X#rest.timestamp > Timeout]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[] ->
-			    ok;
-			Rows ->
-			    [HandleResource(Row) || Row <- Rows],
-			    ok
-		    end
-	    end,
+        Q = qlc:q([
+            X#rest.resourceId
+         || X <- mnesia:table(rest),
+            X#rest.status == new,
+            TimestampNow - X#rest.timestamp > Timeout
+        ]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [] ->
+                ok;
+            Rows ->
+                [HandleResource(Row) || Row <- Rows],
+                ok
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
@@ -658,24 +760,27 @@ delete_expired(Timeout) ->
     % Remove Resource from the rest table. Since an abandonned order won't have a coresponding work item in the work
     % table we do not have to worry about creating an orphaned work item.
     HandleResource = fun(ResourceId) ->
-			     Oid = {rest, ResourceId},
-			     ok = mnesia:delete(Oid)
-		     end,
+        Oid = {rest, ResourceId},
+        ok = mnesia:delete(Oid)
+    end,
 
     % Find all rest resources that linger in the rest table for a long time and are not in the status "new"
     Trans = fun() ->
-		    Q = qlc:q([X#rest.resourceId ||
-				  X <- mnesia:table(rest),
-				  X#rest.status == done, TimestampNow - X#rest.timestamp > Timeout]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[] ->
-			    ok;
-			Rows ->
-			    [HandleResource(Row) || Row <- Rows],
-			    ok
-		    end
-	    end,
+        Q = qlc:q([
+            X#rest.resourceId
+         || X <- mnesia:table(rest),
+            X#rest.status == done,
+            TimestampNow - X#rest.timestamp > Timeout
+        ]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [] ->
+                ok;
+            Rows ->
+                [HandleResource(Row) || Row <- Rows],
+                ok
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
@@ -690,11 +795,11 @@ cleanup() ->
     RcExpired = delete_expired(RestTimeoutExpired),
 
     case {RcStalled, RcNoshow, RcExpired} of
-        {ok,ok,ok} ->
-	    ok;
-	_ ->
-	    logger:error("Cleanup: database error~n"),
-	    error
+        {ok, ok, ok} ->
+            ok;
+        _ ->
+            logger:error("Cleanup: database error~n"),
+            error
     end,
 
     % Next cleanup in 10 secs.
@@ -708,55 +813,69 @@ euicc_setparam() ->
     % euicc table are set.
 
     HandleParam = fun(ResourceId, EidValue, Param) ->
-			  case Param of
-			      {[{Name, Value}]} ->
-				  case trans_update_euicc_param(EidValue, binary_to_atom(Name), Value) of
-				      ok ->
-					  trans_rest_set_status(ResourceId, done,
-								[{[{euiccUpdateResult, ok}]}], none);
-				      _ ->
-					  trans_rest_set_status(ResourceId, done,
-								[{[{euiccUpdateResult, badParam}]}], none)
-				  end;
-			      _ ->
-				  trans_rest_set_status(ResourceId, done,
-							[{[{euiccUpdateResult, badParamFormat}]}], none)
-			  end
-		  end,
+        case Param of
+            {[{Name, Value}]} ->
+                case trans_update_euicc_param(EidValue, binary_to_atom(Name), Value) of
+                    ok ->
+                        trans_rest_set_status(
+                            ResourceId,
+                            done,
+                            [{[{euiccUpdateResult, ok}]}],
+                            none
+                        );
+                    _ ->
+                        trans_rest_set_status(
+                            ResourceId,
+                            done,
+                            [{[{euiccUpdateResult, badParam}]}],
+                            none
+                        )
+                end;
+            _ ->
+                trans_rest_set_status(
+                    ResourceId,
+                    done,
+                    [{[{euiccUpdateResult, badParamFormat}]}],
+                    none
+                )
+        end
+    end,
 
     % Parse order and process each parameter individually
     HandleResource = fun({ResourceId, EidValue, Order}) ->
-			     trans_euicc_create_if_not_exist(EidValue),
-			     case Order of
-				 {[{<<"euicc">>, ParameterList }]} ->
-				     [HandleParam(ResourceId, EidValue, Param) || Param <- ParameterList],
-				     ok;
-				 _ ->
-				     trans_rest_set_status(ResourceId, done, [{[{procedureError, badOrder}]}], none)
-			     end
-		     end,
+        trans_euicc_create_if_not_exist(EidValue),
+        case Order of
+            {[{<<"euicc">>, ParameterList}]} ->
+                [HandleParam(ResourceId, EidValue, Param) || Param <- ParameterList],
+                ok;
+            _ ->
+                trans_rest_set_status(ResourceId, done, [{[{procedureError, badOrder}]}], none)
+        end
+    end,
 
     % Look into facility euicc and find the first entry that is in status "new".
     Trans = fun() ->
-		    Q = qlc:q([{X#rest.resourceId, X#rest.eidValue, X#rest.order} ||
-				  X <- mnesia:table(rest), X#rest.status == new, X#rest.facility == euicc]),
-		    Rows = qlc:e(Q),
-		    case Rows of
-			[] ->
-			    ok;
-			Rows ->
-			    [HandleResource(Row) || Row <- Rows],
-			    ok
-		    end
-	    end,
+        Q = qlc:q([
+            {X#rest.resourceId, X#rest.eidValue, X#rest.order}
+         || X <- mnesia:table(rest), X#rest.status == new, X#rest.facility == euicc
+        ]),
+        Rows = qlc:e(Q),
+        case Rows of
+            [] ->
+                ok;
+            Rows ->
+                [HandleResource(Row) || Row <- Rows],
+                ok
+        end
+    end,
 
     {atomic, Result} = mnesia:transaction(Trans),
     case Result of
         ok ->
-	    ok;
-	_ ->
-	    logger:error("eUICC: euicc procedure failed, database error~n"),
-	    error
+            ok;
+        _ ->
+            logger:error("eUICC: euicc procedure failed, database error~n"),
+            error
     end,
 
     % Next euicc procedure in 10 secs.
@@ -766,27 +885,26 @@ euicc_setparam() ->
 % Dump all currently pending rest items (for debugging, to be called from console)
 dump_rest() ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(rest)]),
-		    qlc:e(Q)
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(rest)]),
+        qlc:e(Q)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
 
 % Dump all currently pending work items (for debugging, to be called from console)
 dump_work() ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(work)]),
-		    qlc:e(Q)
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(work)]),
+        qlc:e(Q)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
 
 % Dump all eUICCs we are aware of
 dump_euicc() ->
     Trans = fun() ->
-		    Q = qlc:q([X || X <- mnesia:table(euicc)]),
-		    qlc:e(Q)
-	    end,
+        Q = qlc:q([X || X <- mnesia:table(euicc)]),
+        qlc:e(Q)
+    end,
     {atomic, Result} = mnesia:transaction(Trans),
     Result.
-
