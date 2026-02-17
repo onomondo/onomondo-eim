@@ -15,3 +15,6 @@ deps
 .rebar3
 _build/
 _checkouts/
+onomondo_eim/asn1_gen/
+
+Mnesia.*

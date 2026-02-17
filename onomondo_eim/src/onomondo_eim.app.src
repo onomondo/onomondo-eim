@@ -1,0 +1,21 @@
+{application, onomondo_eim,
+    [{description, "eUICC IoT Remote Manager"},
+     {vsn, "0.0.1"},
+     {registered, []},
+     {mod, {onomondo_eim_app, []}},
+     {applications, [
+         kernel,
+         stdlib,
+         sasl,
+         crypto,
+         public_key,
+         ssl,
+         mnesia,
+         cowboy,
+         hackney,
+         jiffy,
+         quickrand,
+         uuid
+     ]},
+     {env, []}
+    ]}.
