@@ -13,10 +13,8 @@ execute(Req0 = #{method := <<"POST">>}, State) ->
         <<"gsma/rsp/v2.1.0">> ->
             {ok, Req0, State};
         _ ->
-            Req = cowboy_req:reply(400, <<"Unsupported x-admin-protocol">>, Req0),
-            {ok, Req, State}
+            Req = cowboy_req:reply(400, #{}, <<"Unsupported x-admin-protocol">>, Req0),
+            {stop, Req}
     end;
 execute(Req0, Env) ->
-    io:format("~p request~n", [cowboy_req:method(Req0)]),
-    Req = cowboy_req:reply(405, #{<<"allow">> => <<"POST">>}, Req0),
-    {ok, Req, Env}.
+    {ok, Req0, Env}.

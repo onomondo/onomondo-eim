@@ -3,80 +3,60 @@
 
 -module(onomondo_eim_app).
 -behaviour(application).
--export([start/2]).
+-export([start/2, esipa_dispatch/0]).
 -export([stop/1]).
 
-start(_Type, _Args) ->
-    {ok, Vsn} = application:get_key(onomondo_eim, vsn),
-    logger:notice("eIM! version:~s~n", [Vsn]),
+start_esipa_server(true, Ip, Port, _Cert, _Key, Dispatch) ->
+    logger:notice("Starting ESipa HTTP server at ~p:~p...~n", [Ip, Port]),
+    cowboy:start_clear(
+        http_listener_esipa,
+        [
+            {ip, Ip},
+            {port, Port}
+        ],
+        #{
+            env => #{
+                dispatch => Dispatch
+            },
+            middlewares => [cowboy_router, esipa_middleware, cowboy_handler]
+        }
+    );
+start_esipa_server(false, Ip, Port, Cert, Key, Dispatch) ->
+    logger:notice(
+        "Starting ESipa HTTPs server at ~p:~p...~ncertificate: ~p~nkey: ~p~n",
+        [Ip, Port, Cert, Key]
+    ),
+    cowboy:start_tls(
+        https_listener_esipa,
+        [
+            {ip, Ip},
+            {port, Port},
+            {certfile, Cert},
+            {keyfile, Key}
+        ],
+        #{
+            env => #{
+                dispatch => Dispatch
+            },
+            middlewares => [cowboy_router, esipa_middleware, cowboy_handler]
+        }
+    ).
 
-    % Startup database
-    ok = mnesia_db:init(),
-
-    % Startup ESipa server
-    Dispatch_ESipa = cowboy_router:compile([
+esipa_dispatch() ->
+    cowboy_router:compile([
         {'_', [
             % SGP.32 Section 6.4.1
-            {"/gsma/rsp2/esipa/initiateAuthentication", esipa_initiateAuthentication_handler, []},
-            {"/gsma/rsp2/esipa/authenticateClient", esipa_authenticateClient_handler, []},
-            {"/gsma/rsp2/esipa/getBoundProfilePackage", esipa_getBoundProfilePackage_handler, []},
-            {"/gsma/rsp2/esipa/transferEimPackage", esipa_transferEimPackage_handler, []},
-            {"/gsma/rsp2/esipa/getEimPackage", esipa_getEimPackage_handler, []},
-            {"/gsma/rsp2/esipa/provideEimPackageResult", esipa_provideEimPackageresult_handler, []},
-            {"/gsma/rsp2/esipa/handleNotification", esipa_handleNotification_handler, []},
-            {"/gsma/rsp2/esipa/cancelSession", esipa_cancelSession_handler, []},
+            {"/gsma/rsp2/esipa/[...]", esipa_json_handler, []},
             % SGP.32 Section 6.1.1: Any function execution request using ASN.1 binding SHALL be sent to the generic
             % HTTP path 'gsma/rsp2/asn1'
             {"/gsma/rsp2/asn1", esipa_asn1_handler, []},
             % MISC
             {"/", esipa_infopage, []}
         ]}
-    ]),
-    {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
-    {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
-    {ok, EsipaSslDisable} = application:get_env(onomondo_eim, esipa_ssl_disable),
-    {ok, EsipaSslCert} = application:get_env(onomondo_eim, esipa_ssl_cert),
-    {ok, EsipaSslKey} = application:get_env(onomondo_eim, esipa_ssl_key),
-    case EsipaSslDisable of
-        true ->
-            logger:notice("Starting ESipa HTTP server at ~p:~p...~n", [EsipaIp, EsipaPort]),
-            {ok, _} = cowboy:start_clear(
-                http_listener_esipa,
-                [
-                    {ip, EsipaIp},
-                    {port, EsipaPort}
-                ],
-                #{
-                    env => #{
-                        dispatch => Dispatch_ESipa,
-                        middlewares => [cowboy_router, esipa_middleware, cowboy_handler]
-                    }
-                }
-            );
-        _ ->
-            logger:notice(
-                "Starting ESipa HTTPs server at ~p:~p...~ncertificate: ~p~nkey: ~p~n",
-                [EsipaIp, EsipaPort, EsipaSslCert, EsipaSslKey]
-            ),
-            {ok, _} = cowboy:start_tls(
-                https_listener_esipa,
-                [
-                    {ip, EsipaIp},
-                    {port, EsipaPort},
-                    {certfile, EsipaSslCert},
-                    {keyfile, EsipaSslKey}
-                ],
-                #{
-                    env => #{
-                        dispatch => Dispatch_ESipa,
-                        middlewares => [cowboy_router, esipa_middleware, cowboy_handler]
-                    }
-                }
-            )
-    end,
+    ]).
 
-    % Startup REST server
-    Dispatch_REST = cowboy_router:compile([
+rest_dispatch() ->
+    cowboy_router:compile([
         {'_', [
             % Downloads
             {"/download/create/", rest_handler, [download, create]},
@@ -106,7 +86,33 @@ start(_Type, _Args) ->
             % MISC
             {"/", rest_handler, [info]}
         ]}
-    ]),
+    ]).
+
+start(_Type, _Args) ->
+    {ok, Vsn} = application:get_key(onomondo_eim, vsn),
+    logger:notice("eIM! version:~s~n", [Vsn]),
+
+    % Startup database
+    ok = mnesia_db:init(),
+
+    % Startup ESipa server
+    Dispatch_ESipa = esipa_dispatch(),
+    {ok, EsipaIp} = application:get_env(onomondo_eim, esipa_ip),
+    {ok, EsipaPort} = application:get_env(onomondo_eim, esipa_port),
+    {ok, EsipaSslDisable} = application:get_env(onomondo_eim, esipa_ssl_disable),
+    {ok, EsipaSslCert} = application:get_env(onomondo_eim, esipa_ssl_cert),
+    {ok, EsipaSslKey} = application:get_env(onomondo_eim, esipa_ssl_key),
+    {ok, _} = start_esipa_server(
+        EsipaSslDisable,
+        EsipaIp,
+        EsipaPort,
+        EsipaSslCert,
+        EsipaSslKey,
+        Dispatch_ESipa
+    ),
+
+    % Startup REST server
+    Dispatch_REST = rest_dispatch(),
     {ok, RestIp} = application:get_env(onomondo_eim, rest_ip),
     {ok, RestPort} = application:get_env(onomondo_eim, rest_port),
     logger:notice("Starting REST HTTP server at ~p:~p...~n", [RestIp, RestPort]),
