@@ -49,7 +49,7 @@ esipa_dispatch() ->
             {"/gsma/rsp2/esipa/[...]", esipa_json_handler, []},
             % SGP.32 Section 6.1.1: Any function execution request using ASN.1 binding SHALL be sent to the generic
             % HTTP path 'gsma/rsp2/asn1'
-            {"/gsma/rsp2/asn1", esipa_asn1_handler, []},
+            {"/gsma/rsp2/asn1", esipa_asn1_http_handler, []},
             % MISC
             {"/", esipa_infopage, []}
         ]}

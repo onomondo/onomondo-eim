@@ -1,5 +1,3 @@
-% Common Test suite for eIM
-
 -module(onomondo_eim_SUITE).
 
 -include_lib("common_test/include/ct.hrl").

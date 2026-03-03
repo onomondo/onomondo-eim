@@ -2,29 +2,23 @@
 % Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
 
 -module(esipa_asn1_handler).
--behavior(cowboy_handler).
 
--export([init/2, terminate/3]).
-
--define(RESPONSE_HEADERS, #{
-    <<"content-type">> => <<"application/x-gsma-rsp-asn1">>,
-    <<"x-admin-protocol">> => <<"gsma/rsp/v2.1.0">>
-}).
+-export([handle_asn1/2]).
 
 % Helper function to send out a list of notifications
-handle_asn1_notificationList(_Req0, _State, []) ->
+handle_asn1_notificationList(_Pid, []) ->
     ok;
-handle_asn1_notificationList(Req0, State, NotificationList) ->
+handle_asn1_notificationList(Pid, NotificationList) ->
     [PendingNotification | NotificationListTail] = NotificationList,
-    handle_asn1(Req0, State, {handleNotificationEsipa, {pendingNotification, PendingNotification}}),
-    handle_asn1_notificationList(Req0, State, NotificationListTail).
+    handle_asn1(Pid, {handleNotificationEsipa, {pendingNotification, PendingNotification}}),
+    handle_asn1_notificationList(Pid, NotificationListTail).
 
 %GSMA SGP.32, section 6.3.2.1
-handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
+handle_asn1(Pid, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
+    {_, _, WorkState} = mnesia_db:work_pickup(Pid, none),
     BaseUrl = maps:get(smdpAddress, EsipaReq),
     NewWorkState = WorkState#{smdpAddress => BaseUrl},
-    mnesia_db:work_update(maps:get(pid, Req0), NewWorkState),
+    mnesia_db:work_update(Pid, NewWorkState),
 
     % euiccInfo1 is also an optional field in initiateAuthenticationRequestEsipa and a mandatory field in
     % initiateAuthenticationRequest. However the field is only missing in case the IPA capability minimizeEsipaBytes is
@@ -41,7 +35,7 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
         case Es9Resp of
             {initiateAuthenticationOk, InitAuthOk} ->
                 TransactionId = maps:get(transactionId, InitAuthOk),
-                mnesia_db:work_bind(maps:get(pid, Req0), TransactionId),
+                mnesia_db:work_bind(Pid, TransactionId),
                 % TODO: matchingId and ctxParams1 are not defined in the ES9+ InitiateAuthenticationResponse message.
                 % However in ESipa those fields are optional fields and either one of it should be populated in case an
                 % AC is used (which we do). This means we should populate those fields. The matchingId can be extracted
@@ -53,7 +47,7 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
                 {initiateAuthenticationOkEsipa, InitAuthOk};
             {initiateAuthenticationError, InitAuthErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, initiateAuthenticationError}]}],
                     EsipaReq
                 ),
@@ -61,9 +55,9 @@ handle_asn1(Req0, _State, {initiateAuthenticationRequestEsipa, EsipaReq}) ->
         end,
     {initiateAuthenticationResponseEsipa, EsipaResp};
 %GSMA SGP.32, section 6.3.2.2
-handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
+handle_asn1(Pid, {authenticateClientRequestEsipa, EsipaReq}) ->
     TransactionId = maps:get(transactionId, EsipaReq),
-    {EidValue, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+    {EidValue, _, WorkState} = mnesia_db:work_pickup(Pid, TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
@@ -79,7 +73,7 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
                 }};
             {authenticateResponseError, AuthRespErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, authenticateResponseError}]}],
                     EsipaReq
                 ),
@@ -102,7 +96,7 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
                 {authenticateClientOkDPEsipa, AuthClntRespEs9};
             {authenticateClientError, AuthClntErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, authenticateClientError}]}],
                     EsipaReq
                 ),
@@ -110,9 +104,9 @@ handle_asn1(Req0, _State, {authenticateClientRequestEsipa, EsipaReq}) ->
         end,
     {authenticateClientResponseEsipa, EsipaResp};
 %GSMA SGP.32, section 6.3.2.3
-handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
+handle_asn1(Pid, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
     TransactionId = maps:get(transactionId, EsipaReq),
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+    {_, _, WorkState} = mnesia_db:work_pickup(Pid, TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
@@ -126,7 +120,7 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
                 }};
             {downloadResponseError, DwnldRespErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, downloadResponseError}]}],
                     EsipaReq
                 ),
@@ -151,7 +145,7 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
                 {getBoundProfilePackageOkEsipa, GetBndPrflePkgOk};
             {getBoundProfilePackageError, GetBndPrflePkgErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, getBoundProfilePackageError}]}],
                     EsipaReq
                 ),
@@ -159,9 +153,9 @@ handle_asn1(Req0, _State, {getBoundProfilePackageRequestEsipa, EsipaReq}) ->
         end,
     {getBoundProfilePackageResponseEsipa, EsipaResp};
 %GSMA SGP.32, section 6.3.2.5
-handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
+handle_asn1(Pid, {cancelSessionRequestEsipa, EsipaReq}) ->
     TransactionId = maps:get(transactionId, EsipaReq),
-    {_, _, WorkState} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+    {_, _, WorkState} = mnesia_db:work_pickup(Pid, TransactionId),
     BaseUrl = maps:get(smdpAddress, WorkState),
 
     % setup ES9+ request message
@@ -175,7 +169,7 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
                 }};
             {cancelSessionResponseError, CancelSessionRespErr} ->
                 ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0),
+                    Pid,
                     [{[{procedureError, cancelSessionResponseError}]}],
                     EsipaReq
                 ),
@@ -192,14 +186,14 @@ handle_asn1(Req0, _State, {cancelSessionRequestEsipa, EsipaReq}) ->
     {cancelSessionResponseEs9, Es9Resp} = es9p_client:request_json(Es9Req, BaseUrl),
 
     Outcome = esipa_rest_utils:cancelSessionResponse_to_outcome(CancelSessionResp),
-    ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq),
+    ok = mnesia_db:work_finish(Pid, Outcome, EsipaReq),
 
     % setup ESipa response message
     % CancelSessionResponseEsipa and CancelSessionResponseEs9 share the exact same definition, so we may convert
     % without an extra case statement.
     {cancelSessionResponseEsipa, Es9Resp};
 %GSMA SGP.32, section 6.3.2.4
-handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
+handle_asn1(Pid, {handleNotificationEsipa, EsipaReq}) ->
     case EsipaReq of
         {pendingNotification, PendingNotif} ->
             case PendingNotif of
@@ -221,7 +215,7 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
                     % Notification Receivers (see also GSMA SGP.32, section 3.7) procedure. By then the context in the
                     % eIM may be long gone. The eIM will be unable to match the ProfileInstallationResult to any
                     % context but it will foward it to the SMDP+ anyway.
-                    case mnesia_db:work_bind(maps:get(pid, Req0), TransactionId) of
+                    case mnesia_db:work_bind(Pid, TransactionId) of
                         ok ->
                             % A work item exists, foward the ProfileInstallationResult and make its contents
                             % available to the REST API user
@@ -230,12 +224,10 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
                                     Outcome = esipa_rest_utils:profileInstallationResult_to_outcome(
                                         PrfleInstRslt
                                     ),
-                                    ok = mnesia_db:work_finish(
-                                        maps:get(pid, Req0), Outcome, EsipaReq
-                                    );
+                                    ok = mnesia_db:work_finish(Pid, Outcome, EsipaReq);
                                 _ ->
                                     ok = mnesia_db:work_finish(
-                                        maps:get(pid, Req0),
+                                        Pid,
                                         [{[{procedureError, handleNotificationError}]}],
                                         EsipaReq
                                     )
@@ -262,14 +254,14 @@ handle_asn1(Req0, _State, {handleNotificationEsipa, EsipaReq}) ->
         {provideEimPackageResult, _PrvdeEimPkgRslt} ->
             %Use the already existing handle_asn1 function to prcess the provideEimPackageResult we got here
             %(provideEimPackageResult is directed to the eIM itsself, so there will be no ES9+ request)
-            handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq})
+            handle_asn1(Pid, {provideEimPackageResult, EsipaReq})
     end,
 
     % There is no response defined for this function (see also SGP.32, section 6.3.2.4), so we send just an empty
     % response (0 bytes of data)
     emptyResponse;
 %GSMA SGP.32, section 6.3.2.6
-handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
+handle_asn1(Pid, {getEimPackageRequest, EsipaReq}) ->
     % TODO: The purpose of the notifyStateChange field in the getEimPackageRequest is to inform the eIM that some state
     % in the eUICC has changed and that the eIM (and in particular the REST API user) should perform an update of its
     % local records (eUICC data request, listProfileInfo PSMO etc...) This is a feature that this eIM does not support
@@ -277,20 +269,20 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
     % update. Get the notifyStateChange flag like so: NotifStateChg = maps:is_key(notifyStateChange, EsipaReq).
 
     EidValue = maps:get(eidValue, EsipaReq),
-    Work = mnesia_db:work_fetch(utils:binary_to_hex(EidValue), maps:get(pid, Req0)),
+    Work = mnesia_db:work_fetch(utils:binary_to_hex(EidValue), Pid),
     EsipaResp =
         case Work of
             {download, Order} ->
                 % The first time we see a TransactionId is in the SMDP+ response to the
                 % initiateAuthenticationRequest
                 {[{<<"download">>, {[{<<"activationCode">>, ActivationCode}]}}]} = Order,
-                mnesia_db:work_update(maps:get(pid, Req0), #{}),
+                mnesia_db:work_update(Pid, #{}),
                 {profileDownloadTriggerRequest, #{
                     profileDownloadData => {activationCode, ActivationCode}
                 }};
             {psmo, Order} ->
                 TransactionIdPsmo = rand:bytes(16),
-                mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdPsmo),
+                mnesia_db:work_bind(Pid, TransactionIdPsmo),
                 EuiccPackageSigned = esipa_rest_utils:psmo_order_to_euiccPackageSigned(
                     Order,
                     EidValue,
@@ -299,7 +291,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
                 case EuiccPackageSigned of
                     error ->
                         ok = mnesia_db:work_finish(
-                            maps:get(pid, Req0),
+                            Pid,
                             [{[{procedureError, badPsmo}]}],
                             EsipaReq
                         ),
@@ -316,7 +308,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
                 end;
             {eco, Order} ->
                 TransactionIdEco = rand:bytes(16),
-                mnesia_db:work_bind(maps:get(pid, Req0), TransactionIdEco),
+                mnesia_db:work_bind(Pid, TransactionIdEco),
                 EuiccPackageSigned = esipa_rest_utils:eco_order_to_euiccPackageSigned(
                     Order,
                     EidValue,
@@ -325,7 +317,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
                 case EuiccPackageSigned of
                     error ->
                         ok = mnesia_db:work_finish(
-                            maps:get(pid, Req0),
+                            Pid,
                             [{[{procedureError, badEco}]}],
                             EsipaReq
                         ),
@@ -345,7 +337,7 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
                 case IpaEuiccDataRequest of
                     error ->
                         ok = mnesia_db:work_finish(
-                            maps:get(pid, Req0),
+                            Pid,
                             [{[{procedureError, badEdr}]}],
                             EsipaReq
                         ),
@@ -356,34 +348,32 @@ handle_asn1(Req0, _State, {getEimPackageRequest, EsipaReq}) ->
             none ->
                 {eimPackageError, noEimPackageAvailable};
             _ ->
-                ok = mnesia_db:work_finish(
-                    maps:get(pid, Req0), [{[{procedureError, badOrder}]}], EsipaReq
-                ),
+                ok = mnesia_db:work_finish(Pid, [{[{procedureError, badOrder}]}], EsipaReq),
                 {eimPackageError, undefinedError}
         end,
     {getEimPackageResponse, EsipaResp};
 %GSMA SGP.32, section 6.3.2.7
-handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
+handle_asn1(Pid, {provideEimPackageResult, EsipaReq}) ->
     case EsipaReq of
         {euiccPackageResult, EuiccPackageResult} ->
             ok = esipa_asn1_handler_utils:handle_euiccPackageResult(
-                Req0, EuiccPackageResult, EsipaReq
+                Pid, EuiccPackageResult, EsipaReq
             );
         {ePRAndNotifications, EPRAndNotifications} ->
             % Handle the euiccPackageResult first,
             EuiccPackageResult = maps:get(euiccPackageResult, EPRAndNotifications),
             ok = esipa_asn1_handler_utils:handle_euiccPackageResult(
-                Req0, EuiccPackageResult, EsipaReq
+                Pid, EuiccPackageResult, EsipaReq
             ),
             % then forward the notifications in the included notification list
             RetrieveNotificationsListResponse = maps:get(notificationList, EPRAndNotifications),
             case RetrieveNotificationsListResponse of
                 {notificationList, NotificationList} ->
-                    handle_asn1_notificationList(Req0, _State, NotificationList);
+                    handle_asn1_notificationList(Pid, NotificationList);
                 {notificationsListResultError, NotificationsListResultError} ->
                     logger:notice(
                         "Ipad is reporting a problem to retrieve notifications,~nNotificationsListResultError=~p,~nPid=~p~n",
-                        [NotificationsListResultError, maps:get(pid, Req0)]
+                        [NotificationsListResultError, Pid]
                     );
                 UnhandledObject ->
                     % TODO: The RetrieveNotificationsListResponse may also contain other objects, in particular
@@ -392,17 +382,17 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
                     % those data objects shall be used, so we ignore them for now and display a notice in the log
                     logger:notice(
                         "RetrieveNotificationsListResponse with unhandled object,~UnhandledObject=~p,~nPid=~p~n",
-                        [UnhandledObject, maps:get(pid, Req0)]
+                        [UnhandledObject, Pid]
                     )
             end;
         {ipaEuiccDataResponse, IpaEuiccDataResponse} ->
             % drive-by store the eUICC public key so that we can use it later to sign PSMOs or eCOs
-            {EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0), none),
+            {EidValue, _, _} = mnesia_db:work_pickup(Pid, none),
             crypto_utils:store_euicc_pubkey_from_ipaEuiccDataResponse(
                 IpaEuiccDataResponse, EidValue
             ),
             Outcome = esipa_rest_utils:ipaEuiccDataResponse_to_outcome(IpaEuiccDataResponse),
-            mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq);
+            mnesia_db:work_finish(Pid, Outcome, EsipaReq);
         {profileDownloadTriggerResult, _} ->
             % The profileDownloadTriggerResult is sent by the IPAd in case a profile was downloaded directly from an
             % RSP server, bypassing the eIM (see also SGP.32, section 3.2.3.1). This is a feature that this eIM does
@@ -410,80 +400,14 @@ handle_asn1(Req0, _State, {provideEimPackageResult, EsipaReq}) ->
             throw("unsuppported message type \"profileDownloadTriggerResult\"");
         {eimPackageError, EimPackageError} ->
             Outcome = [{[{eimPackageError, EimPackageError}]}],
-            ok = mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq)
+            ok = mnesia_db:work_finish(Pid, Outcome, EsipaReq)
     end,
     {provideEimPackageResultResponse, undefined};
 %Unsupported request
-handle_asn1(Req0, _State, Request) ->
-    mnesia_db:work_finish(maps:get(pid, Req0), [{[{procedureError, abortedOrder}]}], unsupported),
+handle_asn1(Pid, Request) ->
+    mnesia_db:work_finish(Pid, [{[{procedureError, abortedOrder}]}], unsupported),
     logger:info(
         "Handling of IPAd request failed, the request type is unsupported,~nRequest=~p,~nPid=~p~n",
-        [Request, maps:get(pid, Req0)]
+        [Request, Pid]
     ),
-    cowboy_req:reply(400, ?RESPONSE_HEADERS, <<"Unsupported Request">>, Req0).
-
-% The ASN.1 encoder that is generated using erlang's (asn1ct) encodes an additional constructed tag in front of the
-% actual EsipaMessageFromEimToIpa. This is probably due to the fact that EsipaMessageFromEimToIpa is a choice
-% definition (anonymous) that is misinterpreted by the ASN.1 compiler. It is conspicuous that chosen tag for the excess
-% constructed tag is always the tag of the chosen type. In general one would expect to see the tag of the chosen type
-% followed by the length+value of the chosen type. (see also ITU-T Rec. X.690, section 8.13). In any case, since we are
-% at the top level, we can work % around this by directly encoding the chosen type.
-encode_eim_to_ipa({getEimPackageResponse, EimToIpaChoice}) ->
-    'SGP32Definitions':encode('GetEimPackageResponse', EimToIpaChoice);
-encode_eim_to_ipa({authenticateClientResponseEsipa, EimToIpaChoice}) ->
-    'SGP32Definitions':encode('AuthenticateClientResponseEsipa', EimToIpaChoice);
-encode_eim_to_ipa({initiateAuthenticationResponseEsipa, EimToIpaChoice}) ->
-    'SGP32Definitions':encode('InitiateAuthenticationResponseEsipa', EimToIpaChoice);
-encode_eim_to_ipa({getBoundProfilePackageResponseEsipa, EimToIpaChoice}) ->
-    'SGP32Definitions':encode('GetBoundProfilePackageResponseEsipa', EimToIpaChoice);
-encode_eim_to_ipa({cancelSessionResponseEsipa, EimToIpaChoice}) ->
-    'SGP32Definitions':encode('CancelSessionResponseEsipa', EimToIpaChoice);
-encode_eim_to_ipa(emptyResponse) ->
-    {ok, <<>>};
-encode_eim_to_ipa(EimToIpa) ->
-    'SGP32Definitions':encode('EsipaMessageFromEimToIpa', EimToIpa).
-
-% Process HTTP request
-init(Req0, State) ->
-    Req =
-        case cowboy_req:header(<<"content-type">>, Req0) of
-            <<"application/x-gsma-rsp-asn1">> ->
-                % do the asn1 decode of the request body; dispatch to real handler
-                {ok, Data, Req1} = cowboy_req:read_body(Req0),
-                {ok, IpaToEim} = 'SGP32Definitions':decode('EsipaMessageFromIpaToEim', Data),
-                {EsipaMsgType, _} = IpaToEim,
-                logger:info(
-                    "Handling incoming IPAd request: ~p,~nPeer=~p, Pid=~p~n",
-                    [EsipaMsgType, maps:get(peer, Req0), maps:get(pid, Req0)]
-                ),
-                logger:debug(
-                    "Rx ESipa ASN.1,~nPeer=~p, Pid=~p,~nIpaToEim=~p~n",
-                    [maps:get(peer, Req0), maps:get(pid, Req0), IpaToEim]
-                ),
-                EimToIpa = handle_asn1(Req1, State, IpaToEim),
-                logger:debug(
-                    "Tx ESipa ASN.1,~nPeer=~p,Pid=~p,~nEimToIpa=~p~n",
-                    [maps:get(peer, Req0), maps:get(pid, Req0), EimToIpa]
-                ),
-                {ok, EncodedRespBody} = encode_eim_to_ipa(EimToIpa),
-                cowboy_req:reply(200, ?RESPONSE_HEADERS, EncodedRespBody, Req0);
-            _ ->
-                cowboy_req:reply(415, ?RESPONSE_HEADERS, <<"Unsupported content-type">>, Req0)
-        end,
-    {ok, Req, State}.
-
-% Handle termination of HTTP requests
-terminate(Reason, Req0, _State) ->
-    case Reason of
-        normal ->
-            ok;
-        _ ->
-            mnesia_db:work_finish(
-                maps:get(pid, Req0), [{[{procedureError, abortedOrder}]}], Reason
-            ),
-            logger:info(
-                "Handling of IPAd request terminated unexpectetly, Reason=~p Pid=~p~n",
-                [Reason, maps:get(pid, Req0)]
-            ),
-            cowboy_req:reply(500, ?RESPONSE_HEADERS, <<"Internal Server Error">>, Req0)
-    end.
+    {error, unsupported_request}.

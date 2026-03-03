@@ -20,18 +20,18 @@ transactionId_from_euiccPackageResult(EuiccPackageResult) ->
             none
     end.
 
-process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId) ->
+process_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq, TransactionId) ->
     WorkBind = fun(Map) ->
         case maps:is_key(transactionId, Map) of
             true ->
-                mnesia_db:work_bind(maps:get(pid, Req0), maps:get(transactionId, Map));
+                mnesia_db:work_bind(Pid, maps:get(transactionId, Map));
             _ ->
                 ok
         end
     end,
 
     CheckCounterValue = fun(Map) ->
-        {EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+        {EidValue, _, _} = mnesia_db:work_pickup(Pid, TransactionId),
         CounterValueIpad = maps:get(counterValue, Map),
         {ok, CounterValueEim} = mnesia_db:euicc_param_get(EidValue, counterValue),
         case CounterValueIpad of
@@ -79,18 +79,18 @@ process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId) ->
                 [{[{euiccPackageErrorCode, undefinedError}]}]
         end,
 
-    mnesia_db:work_finish(maps:get(pid, Req0), Outcome, EsipaReq).
+    mnesia_db:work_finish(Pid, Outcome, EsipaReq).
 
 % Handle an EuiccPackageResult, this includes everything from the handling of the work items in mnesia_db, down to
 % signature checks and the generation of an appropriate outcome for the REST API.
-handle_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq) ->
+handle_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq) ->
     TransactionId = transactionId_from_euiccPackageResult(EuiccPackageResult),
-    {EidValue, _, _} = mnesia_db:work_pickup(maps:get(pid, Req0), TransactionId),
+    {EidValue, _, _} = mnesia_db:work_pickup(Pid, TransactionId),
     case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) of
         ok ->
-            process_euiccPackageResult(Req0, EuiccPackageResult, EsipaReq, TransactionId);
+            process_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq, TransactionId);
         _ ->
             mnesia_db:work_finish(
-                maps:get(pid, Req0), [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq
+                Pid, [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq
             )
     end.
