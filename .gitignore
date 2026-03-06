@@ -5,3 +5,7 @@ erl_crash.dump
 _build/
 asn1_gen/
 Mnesia.*
+
+.terraform
+terraform*
+.terraform.lock.hcl
