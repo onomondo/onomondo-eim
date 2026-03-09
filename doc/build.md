@@ -42,11 +42,14 @@ Will build using the `dev` profile, which is defined to use the
 [`config/sys.dev.config`](../config/sys.dev.config), which disables TLS for
 local development.
 
-
 As part of this process, rebar3 will precompile `asn1/*.asn1` files into
 `asn1_gen/*.[asn1db|erl]` outputs. This is a build artifact that is used by the
 erlang compiler proper to link into the main application. In point of fact
 erlang's first class asn1 support is a driving factor for its use here.
+
+Usually build artifacts land in `_build`, but it simplifies the erlang
+compiler/linker step to have this output in tree. It is gitignored and should
+not be modified directly.
 
 Some additional commands:
 
@@ -64,14 +67,12 @@ rebar3 ct
 
 Builds and runs [Common Test](https://www.erlang.org/doc/apps/common_test/basics_chapter.html)
 
-
 The overall process may take a while since erlang.mk will also take care of
 downloading and compiling further erlang related dependencies. The build
 process can also be started with `make run`. This will start the application
 immediately after finishing the compilation.
 
 A typical output after the first startup
-
 
 ```
 $ rebar3 as dev shell
@@ -107,15 +108,15 @@ $ rebar3 as dev shell
 ===> Compiling c_src/double-conversion/fast-dtoa.cc
 ===> Compiling c_src/double-conversion/fixed-dtoa.cc
 ===> Compiling c_src/double-conversion/strtod.cc
-===> Linking /Users/jfo/development/esim-iot-base/eim/_build/default/lib/jiffy/priv/jiffy.so
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/DERSignature.asn1"
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/PEDefinitions.asn1"
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/PKIX1Explicit88.asn1"
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/PKIX1Implicit88.asn1"
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/RSPDefinitions.asn1"
-===> Generating parser for: "/Users/jfo/development/esim-iot-base/eim/asn1/SGP32Definitions.asn1"
+===> Linking eim/_build/default/lib/jiffy/priv/jiffy.so
+===> Generating parser for: "eim/asn1/DERSignature.asn1"
+===> Generating parser for: "eim/asn1/PEDefinitions.asn1"
+===> Generating parser for: "eim/asn1/PKIX1Explicit88.asn1"
+===> Generating parser for: "eim/asn1/PKIX1Implicit88.asn1"
+===> Generating parser for: "eim/asn1/RSPDefinitions.asn1"
+===> Generating parser for: "eim/asn1/SGP32Definitions.asn1"
 ===> Analyzing applications...
-===> Compiling onomondo_eim
+===> Compiling eim
 Erlang/OTP 28 [erts-16.2] [source] [64-bit] [smp:11:11] [ds:11:11:10] [async-threads:1] [jit]
 
 Eshell V16.2 (press Ctrl+G to abort, type help(). for help)

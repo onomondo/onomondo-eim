@@ -135,4 +135,3 @@ in progress (`status` = `work`) are terminated. Since the `work` table is kept i
 contents. When onomondo-eim restarts it will go through the `rest` table to set the status of each rest resource that
 still has its `status` set to `work` to `done`. To make the REST API user aware of the situation an appropriate
 `procedureError` code is set ase well (`abortedOrder`).
-
