@@ -1,6 +1,6 @@
 {application, onomondo_eim, [
     {description, "eUICC IoT Remote Manager"},
-    {vsn, "0.0.1"},
+    {vsn, "0.0.2"},
     {registered, []},
     {mod, {onomondo_eim_app, []}},
     {applications, [
