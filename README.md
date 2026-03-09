@@ -3,6 +3,11 @@ onomondo-eim is an erlang based eIM (Remote provisioning and management of the e
 implementation. Besides an ES9+ (SMDP+) and an ESipa (IPAd) interface it also features a REST API that allows an API
 user to perform management tasks on the eUICC (profile download, execution of PSMOs, eCOs and eUICC data requests).
 
+This code currently implements SGP.32 v1.0, an early version
+of the GSMA specifications which did never get used in production.  The only SAS-SM accredited eUICCs
+implemented the later SGP.32 v1.2. For differences, see
+this [summary of SGP.32 changes](https://osmocom.org/projects/sim-card-related/wiki/GSMA_SGP32_ChangeLog).
+
 Interfaces
 ----------
 
