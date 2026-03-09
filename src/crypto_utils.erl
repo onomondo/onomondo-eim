@@ -1,3 +1,7 @@
+% Copyright (c) 2025 Onomondo ApS & sysmocom - s.f.m.c. GmbH. All rights reserved.
+%
+% SPDX-License-Identifier: AGPL-3.0-only
+%
 % Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
 
 %TODO: This code still lacks the verification of signatures, the reason for this is that it was still not possible to
