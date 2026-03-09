@@ -1,36 +1,40 @@
-recommended watchexec: cross platform
+Currently the unit test setup is limited: a basic harness and a few assertion
+tests, using the [Common
+Test](https://www.erlang.org/doc/apps/common_test/basics_chapter.html)
+framework that ships with Erlang/OTP
+
+
+Run tests using:
+
 ```
-$ watchexec -e erl rebar3 ct --suite onomondo_eim_SUITE --case esipa_minimal_asn1_request
+$ rebar3 ct
 ```
 
-coverage can be generated with
+Test runs can be limited in scope:
+
+```
+rebar3 ct --suite onomondo_eim_SUITE --case esipa_minimal_asn1_request
+```
+
+A coverage report can be generated with
 
 ```
 $ rebar3 ct --cover
 ```
 
-and then
+...and then...
 
 ```
 $ rebar3 cover
 ```
 
-will create a nice html report.
+Will generate a nice html view of it.
 
-also optional:
+`rebar3` and/or Common Test does not support file watching, a cross platform
+alternative is [`watchexec`](https://github.com/watchexec/watchexec)
+
+ex watching `.erl` files and rerunning tests:
 
 ```
-diff --git a/rebar.config b/rebar.config
-index 43b3505..957f4cd 100644
---- a/rebar.config
-+++ b/rebar.config
-@@ -16,7 +16,7 @@
-
- {provider_hooks, [{pre, [{compile, {asn1, compile}}]}]}.
-
--{ct_opts, [{sys_config, "config/sys.test.config"}]}.
-+{ct_opts, [{sys_config, "config/sys.test.config"}, {cover, true}]}.
-
- {profiles, [
-     {dev, [
+$ watchexec -e erl rebar3 ct
 ```

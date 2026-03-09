@@ -34,22 +34,28 @@ Getting Started
 
 ### Installing run time dependencies
 
-* Dependencies required to compile and run the onomondo_eim erlang application:
+Required to compile and run the onomondo_eim erlang application:
+
     * erlang
     * rebar3
 
-A `.tool-versions` file is included for version specification, and recommended to be used with [asdf](https://asdf-vm.com/guide/getting-started.html)
+A `.tool-versions` file is included for version specification, and can be used
+with: 
 
-TODO: fill out plugin installation instructions.
+* [asdf](https://asdf-vm.com/guide/getting-started.html)
+    * [asdf-erlang](https://github.com/asdf-vm/asdf-erlang)
+    * [asdf-rebar](https://github.com/Stratus3D/asdf-rebar)
 
-* Dependencies required to compile and run the restop.py tool
+Required to compile and run the restop.py tool:
+
+* python3
+  * [erlang-py](https://pypi.org/project/erlang-py/)
+  * [requests](https://pypi.org/project/requests/)
+
 ```
-  apt-get install python3-full
   pip3 install erlang-py
   pip3 install requests
 ```
-
-TODO: virtualize this env etc requirements.txt.
 
 Documentation
 -------------
