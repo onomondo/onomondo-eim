@@ -1,271 +1,285 @@
 {
-    "$id": "https://onomondo.com/schemas/resource",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "REST API resource",
-    "type": "object",
-    "properties": {
-	"eidValue": {
-	    "description": "EID value of the eUICC to be addressed",
-	    "type": "string",
-	    "pattern": "^[0-9,A-F]{2,32}$"
-	},
-	"order": {
-	    "description": "Order to be executed",
-	    "type": "object",
-	    "anyOf": [
-		{
-		    "download": {
-			"description": "order to trigger a profile download",
-			"type": "object",
-			"properties": {
-			    "activationCode": {
-				"description": "see GSMA SGP.22, section 4.1",
-				"type": "string"
-			    },
-			    "required": [
-				"activationCode"
-			    ]
-			}
-		    }
-		},{
-		    "psmo": {
-			"description": "order the execution of a PSMO, see also GSMA SGP.32, section 2.11.1.1.2",
-			"type": "array",
-			"items": {
-			    "type": "object",
-			    "properties": {
-				"anyOf": [
-				    {
-					"enable": {
-					    "description": "order the execution of a profile enable PSMO, see also GSMA SGP.32, section 3.4.1",
-					    "type": "object",
-					    "properties": {
-						"iccid": {
-						    "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"rollback": {
-						    "description": "see also GSMA SGP.32, section 3.4.1, subsection 'Profile Rollback Procedure'",
-						    "type": "boolean"
-						}
-					    },
-					    "required": [
-						"iccid"
-					    ]
-					}
-				    },{
-					"disable": {
-					    "description": "order the execution of a profile disable PSMO, see also GSMA SGP.32, section 3.4.2",
-					    "type": "object",
-					    "properties": {
-						"iccid": {
-						    "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						}
-					    },
-					    "required": [
-						"iccid"
-					    ]
-					}
-				    },{
-					"delete": {
-					    "description": "order the execution of a profile delete PSMO, see also GSMA SGP.32, section 3.4.3",
-					    "type": "object",
-					    "properties": {
-						"iccid": {
-						    "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						}
-					    },
-					    "required": [
-						"iccid"
-					    ]
-					}
-				    },{
-					"listProfileInfo": {
-					    "description": "order the execution of a listProfileInfo PSMO",
-					    "type": "object",
-					    "properties": {
-						"searchCriteria": {
-						    "anyOf": [
-							{
-							    "isdpAid": {
-								"description": "AID of the ISDP (identifies a profile)",
-								"type": "string",
-								"pattern": "^[0-9,A-F]{2,32}$"
-							    }
-							},{
-							    "iccid": {
-								"description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-								"type": "string",
-								"pattern": "^[0-9,A-F]{2,32}$"
-							    }
-							},{
-							    "profileClass": {
-								"description": "0=test, 1=provisioning, 2=operational",
-								"type": "integer"
-							    }
-							}
-						    ]
-						},
-						"taglist": {
-						    "description": "concatonation of the BER-TLV tags that shall be included in the response",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"required": [
-						    "searchCriteria"
-						]
-					    }
-					}
-				    },{
-					"getRAT": {
-					    "description": "order the execution of a getRAT PSMO, see also GSMA SGP.32, section 5.9.13",
-					    "type": "object",
-					    "properties": {
-					    }
-					}
-				    },{
-					"configureAutoEnable": {
-					    "description": "order the execution of a configureAutoEnable PSMO, see also GSMA SGP.32, section 5.13.6",
-					    "type": "object",
-					    "properties": {
-						"autoEnableFlag": {
-						    "description": "enable/disable automatic profile enabeling",
-						    "type": "boolean"
-						},
-						"objid": {
-						    "description": "object ID of the default SMDP+",
-						    "type": "string"
-						},
-						"smdpAddress": {
-						    "description": "FQDN of the default SMDP+",
-						    "type": "string"
-						},
-						"required": [
-						    "autoEnableFlag"
-						]
-					    }
-					}
-				    }
-				]
-			    }
-			}
-		    }
-		},{
-		    "eco": {
-			"description": "order the execition of a eCO, see also GSMA SGP.32, section 2.11.1.1.3",
-			"type": "array",
-			"items": {
-			    "type": "object",
-			    "properties": {
-				"anyOf": [
-				    {
-					"addEim": {
-					    "description": "add an eIM",
-					    "type": "object",
-					    "properties": {
-						"eimConfigurationData": {
-						    "description": "ASN.1 encoded EimConfigurationData",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						}
-					    },
-					    "required": [
-						"eimConfigurationData"
-					    ]
-					}
-				    },{
-					"deleteEim": {
-					    "description": "delete an eIM",
-					    "type": "object",
-					    "properties": {
-						"eimId": {
-						    "description": "eimId of the eIM",
-						    "type": "string"
-						}
-					    },
-					    "required": [
-						"eimId"
-					    ]
-					}
-				    },{
-					"updateEim": {
-					    "description": "update an eIM",
-					    "type": "object",
-					    "properties": {
-						"eimConfigurationData": {
-						    "description": "ASN.1 encoded EimConfigurationData",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						}
-					    },
-					    "required": [
-						"eimConfigurationData"
-					    ]
-					}
-				    },{
-					"listEim": {
-					    "description": "list all configured eIMs",
-					    "type": "object",
-					    "properties": {
-					    }
-					}
-				    }
-				]
-			    }
-			}
-		    }
-		},{
-		    "edr": {
-			"description": "order to perform an IpaEuiccDataRequest",
-			"type": "object",
-			"properties": {
-			    "tagList": {
-				"description": "see GSMA SGP.32, section 2.11.1.2",
-				"type": "string",
-				"pattern": "^[0-9,A-F]{2,32}$"
-			    },
-			    "required": [
-				"tagList"
-			    ]
-			}
-		    }
-		},{
-		    "euicc": {
-			"description": "set a parameter in the euicc master data table",
-			"type": "array",
-			"items": {
-			    "counterValue": {
-				"description": "sets the signature counter to a specified value (use with caution)",
-				"type": "integer"
-			    },
-			    "consumerEuicc": {
-				"description": "tells the eIM that the remote end (IPAd) uses a consumer eUICC with an IoT eUICC emulation mode",
-				"type": "boolean"
-			    },
-			    "associationToken": {
-				"description": "association token that the eUICC uses to identify this eIM internally",
-				"type": "integer"
-			    },
-			    "signAlgo": {
-				"description": "algorithm to be used for checking eUICC package results",
-				"type": "string",
-				"enum": ["prime256v1",
-					 "brainpoolP256r1"]
-			    },
-			    "signPubKey": {
-				"description": "public key to be used for checking eUICC package results",
-				"type": "string",
-				"pattern": "^[0-9,A-F]{2,32}$"
-			    }
-			}
-		    }
-		}
-	    ]
-	}
+  "$id": "https://onomondo.com/schemas/resource",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "REST API resource",
+  "type": "object",
+  "properties": {
+    "eidValue": {
+      "description": "EID value of the eUICC to be addressed",
+      "type": "string",
+      "pattern": "^[0-9,A-F]{2,32}$"
+    },
+    "order": {
+      "description": "Order to be executed",
+      "type": "object",
+      "anyOf": [
+        {
+          "download": {
+            "description": "order to trigger a profile download",
+            "type": "object",
+            "properties": {
+              "activationCode": {
+                "description": "see GSMA SGP.22, section 4.1",
+                "type": "string"
+              },
+              "required": [
+                "activationCode"
+              ]
+            }
+          }
+        },
+        {
+          "psmo": {
+            "description": "order the execution of a PSMO, see also GSMA SGP.32, section 2.11.1.1.2",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "anyOf": [
+                  {
+                    "enable": {
+                      "description": "order the execution of a profile enable PSMO, see also GSMA SGP.32, section 3.4.1",
+                      "type": "object",
+                      "properties": {
+                        "iccid": {
+                          "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "rollback": {
+                          "description": "see also GSMA SGP.32, section 3.4.1, subsection 'Profile Rollback Procedure'",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "iccid"
+                      ]
+                    }
+                  },
+                  {
+                    "disable": {
+                      "description": "order the execution of a profile disable PSMO, see also GSMA SGP.32, section 3.4.2",
+                      "type": "object",
+                      "properties": {
+                        "iccid": {
+                          "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        }
+                      },
+                      "required": [
+                        "iccid"
+                      ]
+                    }
+                  },
+                  {
+                    "delete": {
+                      "description": "order the execution of a profile delete PSMO, see also GSMA SGP.32, section 3.4.3",
+                      "type": "object",
+                      "properties": {
+                        "iccid": {
+                          "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        }
+                      },
+                      "required": [
+                        "iccid"
+                      ]
+                    }
+                  },
+                  {
+                    "listProfileInfo": {
+                      "description": "order the execution of a listProfileInfo PSMO",
+                      "type": "object",
+                      "properties": {
+                        "searchCriteria": {
+                          "anyOf": [
+                            {
+                              "isdpAid": {
+                                "description": "AID of the ISDP (identifies a profile)",
+                                "type": "string",
+                                "pattern": "^[0-9,A-F]{2,32}$"
+                              }
+                            },
+                            {
+                              "iccid": {
+                                "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                                "type": "string",
+                                "pattern": "^[0-9,A-F]{2,32}$"
+                              }
+                            },
+                            {
+                              "profileClass": {
+                                "description": "0=test, 1=provisioning, 2=operational",
+                                "type": "integer"
+                              }
+                            }
+                          ]
+                        },
+                        "taglist": {
+                          "description": "concatonation of the BER-TLV tags that shall be included in the response",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "required": [
+                          "searchCriteria"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "getRAT": {
+                      "description": "order the execution of a getRAT PSMO, see also GSMA SGP.32, section 5.9.13",
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  {
+                    "configureAutoEnable": {
+                      "description": "order the execution of a configureAutoEnable PSMO, see also GSMA SGP.32, section 5.13.6",
+                      "type": "object",
+                      "properties": {
+                        "autoEnableFlag": {
+                          "description": "enable/disable automatic profile enabeling",
+                          "type": "boolean"
+                        },
+                        "objid": {
+                          "description": "object ID of the default SMDP+",
+                          "type": "string"
+                        },
+                        "smdpAddress": {
+                          "description": "FQDN of the default SMDP+",
+                          "type": "string"
+                        },
+                        "required": [
+                          "autoEnableFlag"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "eco": {
+            "description": "order the execition of a eCO, see also GSMA SGP.32, section 2.11.1.1.3",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "anyOf": [
+                  {
+                    "addEim": {
+                      "description": "add an eIM",
+                      "type": "object",
+                      "properties": {
+                        "eimConfigurationData": {
+                          "description": "ASN.1 encoded EimConfigurationData",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        }
+                      },
+                      "required": [
+                        "eimConfigurationData"
+                      ]
+                    }
+                  },
+                  {
+                    "deleteEim": {
+                      "description": "delete an eIM",
+                      "type": "object",
+                      "properties": {
+                        "eimId": {
+                          "description": "eimId of the eIM",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "eimId"
+                      ]
+                    }
+                  },
+                  {
+                    "updateEim": {
+                      "description": "update an eIM",
+                      "type": "object",
+                      "properties": {
+                        "eimConfigurationData": {
+                          "description": "ASN.1 encoded EimConfigurationData",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        }
+                      },
+                      "required": [
+                        "eimConfigurationData"
+                      ]
+                    }
+                  },
+                  {
+                    "listEim": {
+                      "description": "list all configured eIMs",
+                      "type": "object",
+                      "properties": {}
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "edr": {
+            "description": "order to perform an IpaEuiccDataRequest",
+            "type": "object",
+            "properties": {
+              "tagList": {
+                "description": "see GSMA SGP.32, section 2.11.1.2",
+                "type": "string",
+                "pattern": "^[0-9,A-F]{2,32}$"
+              },
+              "required": [
+                "tagList"
+              ]
+            }
+          }
+        },
+        {
+          "euicc": {
+            "description": "set a parameter in the euicc master data table",
+            "type": "array",
+            "items": {
+              "counterValue": {
+                "description": "sets the signature counter to a specified value (use with caution)",
+                "type": "integer"
+              },
+              "consumerEuicc": {
+                "description": "tells the eIM that the remote end (IPAd) uses a consumer eUICC with an IoT eUICC emulation mode",
+                "type": "boolean"
+              },
+              "associationToken": {
+                "description": "association token that the eUICC uses to identify this eIM internally",
+                "type": "integer"
+              },
+              "signAlgo": {
+                "description": "algorithm to be used for checking eUICC package results",
+                "type": "string",
+                "enum": [
+                  "prime256v1",
+                  "brainpoolP256r1"
+                ]
+              },
+              "signPubKey": {
+                "description": "public key to be used for checking eUICC package results",
+                "type": "string",
+                "pattern": "^[0-9,A-F]{2,32}$"
+              }
+            }
+          }
+        }
+      ]
     }
+  }
 }

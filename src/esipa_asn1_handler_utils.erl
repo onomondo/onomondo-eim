@@ -1,0 +1,100 @@
+% Copyright (c) 2025 Onomondo ApS & sysmocom - s.f.m.c. GmbH. All rights reserved.
+%
+% SPDX-License-Identifier: AGPL-3.0-only
+%
+% Author: Philipp Maier <pmaier@sysmocom.de> / sysmocom - s.f.m.c. GmbH
+
+-module(esipa_asn1_handler_utils).
+
+-export([handle_euiccPackageResult/3]).
+
+transactionId_from_euiccPackageResult(EuiccPackageResult) ->
+    case EuiccPackageResult of
+        {euiccPackageResultSigned, EuiccPackageResultSigned} ->
+            EuiccPackageResultDataSigned = maps:get(
+                euiccPackageResultDataSigned, EuiccPackageResultSigned
+            ),
+            maps:get(transactionId, EuiccPackageResultDataSigned);
+        {euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
+            EuiccPackageErrorDataSigned = maps:get(
+                euiccPackageErrorDataSigned, EuiccPackageErrorSigned
+            ),
+            maps:get(transactionId, EuiccPackageErrorDataSigned);
+        _ ->
+            none
+    end.
+
+process_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq, TransactionId) ->
+    WorkBind = fun(Map) ->
+        case maps:is_key(transactionId, Map) of
+            true ->
+                mnesia_db:work_bind(Pid, maps:get(transactionId, Map));
+            _ ->
+                ok
+        end
+    end,
+
+    CheckCounterValue = fun(Map) ->
+        {EidValue, _, _} = mnesia_db:work_pickup(Pid, TransactionId),
+        CounterValueIpad = maps:get(counterValue, Map),
+        {ok, CounterValueEim} = mnesia_db:euicc_param_get(EidValue, counterValue),
+        case CounterValueIpad of
+            CounterValueEim ->
+                ok;
+            _ ->
+                logger:error(
+                    "invalid euiccPackageResultSigned, counterValue mismatch: CounterValueIpad=~p, CounterValueEim=~p~n",
+                    [CounterValueIpad, CounterValueEim]
+                ),
+                error
+        end
+    end,
+
+    Outcome =
+        case EuiccPackageResult of
+            {euiccPackageResultSigned, EuiccPackageResultSigned} ->
+                EuiccPackageResultDataSigned = maps:get(
+                    euiccPackageResultDataSigned, EuiccPackageResultSigned
+                ),
+                WorkBind(EuiccPackageResultDataSigned),
+                case CheckCounterValue(EuiccPackageResultDataSigned) of
+                    ok ->
+                        esipa_rest_utils:euiccPackageResultDataSigned_to_outcome(
+                            EuiccPackageResultDataSigned
+                        );
+                    _ ->
+                        [{[{euiccPackageErrorCode, counterValueMismatch}]}]
+                end;
+            {euiccPackageErrorSigned, EuiccPackageErrorSigned} ->
+                EuiccPackageErrorDataSigned = maps:get(
+                    euiccPackageErrorDataSigned, EuiccPackageErrorSigned
+                ),
+                WorkBind(EuiccPackageErrorDataSigned),
+                EuiccPackageErrorCode = maps:get(
+                    euiccPackageErrorCode, EuiccPackageErrorDataSigned
+                ),
+                case CheckCounterValue(EuiccPackageErrorDataSigned) of
+                    ok ->
+                        [{[{euiccPackageErrorCode, EuiccPackageErrorCode}]}];
+                    _ ->
+                        [{[{euiccPackageErrorCode, counterValueMismatch}]}]
+                end;
+            {euiccPackageErrorUnsigned, _} ->
+                [{[{euiccPackageErrorCode, undefinedError}]}]
+        end,
+
+    mnesia_db:work_finish(Pid, Outcome, EsipaReq).
+
+% Handle an EuiccPackageResult, this includes everything from the handling of the work items in mnesia_db, down to
+% signature checks and the generation of an appropriate outcome for the REST API.
+handle_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq) ->
+    TransactionId = transactionId_from_euiccPackageResult(EuiccPackageResult),
+    {EidValue, _, _} = mnesia_db:work_pickup(Pid, TransactionId),
+    case crypto_utils:verify_euiccPackageResultSigned(EuiccPackageResult, EidValue) of
+        ok ->
+            process_euiccPackageResult(Pid, EuiccPackageResult, EsipaReq, TransactionId);
+        _ ->
+            mnesia_db:work_finish(
+                Pid, [{[{procedureError, euiccSignatureInvalid}]}], EsipaReq
+            )
+    end.

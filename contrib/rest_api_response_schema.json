@@ -1,432 +1,492 @@
 {
-    "$id": "https://onomondo.com/schemas/response",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "REST API response",
-    "type": "object",
-    "properties": {
-	"status": {
-	    "description": "general processing status of the order",
-	    "type": "string",
-	    "enum": ["new",
-		     "work",
-		     "done",
-		     "deleted",
-		     "absent"]
-	},
-	"timestamp": {
-	    "description": "unix-timestamp of the last status update",
-	    "type": "string"
-	},
-	"resource": {"$ref" : "/schemas/resource"},
-	"outcome" : {
-	    "description": "specific result if the executed order",
-	    "type": "array",
-	    "items": {
-		"type": "object",
-		"properties": {
-		    "anyOf": [
-			{
-			    "enableResult": {
-				"description": "profile enable PSMO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "iccidOrAidNotFound",
-					 "profileNotInDisabledState",
-					 "undefinedError"]
-			    }
-			},{
-			    "disableResult": {
-				"description": "profile disable PSMO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "iccidOrAidNotFound",
-					 "profileNotInEnabledState",
-					 "undefinedError"]
-			    }
-			},{
-			    "deleteResult": {
-				"description": "profile delete PSMO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "iccidOrAidNotFound",
-					 "profileNotInDisabledState",
-					 "undefinedError"]
-			    }
-			},{
-			    "listProfileInfoResult": {
-				"description": "listProfileInfoResult PSMO result, see also SGP32Definitions.asn1",
-				"type": "object",
-				"properties" : {
-				    "finalResult": {
-					"description": "overall status code to inform about success or failure",
-					"type": "string",
-					"enum": ["successResult", "errorResult"]
-				    },
-				    "profileInfoList": {
-					"description": "contains a list of installed profiles and their meta data, see also RSPDefinitions.asn1",
-					"type": "array",
-					"items": {
-					    "type": "object",
-					    "properties": {
-						"iccid": {
-						    "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"isdpAid": {
-						    "description": "AID of the ISDP (identifies a profile)",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"profileState": {
-						    "description": "usage state of the prifle",
-						    "type": "string",
-						    "enum": ["disabled", "enabled"]
-						},
-						"profileNickname": {
-						    "description": "human readable nickname name of the profile",
-						    "type": "string"
-						},
-						"serviceProviderName": {
-						    "description": "human readable name of the related service provider",
-						    "type": "string"
-						},
-						"profileName": {
-						    "description": "human readable name of the profile",
-						    "type": "string"
-						},
-						"iconType": {
-						    "description": "graphics format in which the profile icon is supplied",
-						    "type": "string"
-						},
-						"icon": {
-						    "description": "icon graphic",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"profileClass": {
-						    "description": "0=test, 1=provisioning, 2=operational",
-						    "type": "integer"
-						}
-					    }
-					}
-				    },
-				    "required": [
-					"finalResult"
-				    ]
-				}
-			    }
-			},{
-			    "getRATResult": {
-				"description": "getRAT (rules authorization table) PSMO result, see also RSPDefinitions.asn1",
-				"type": "array",
-				"items": {
-				    "type": "object",
-				    "properties": {
-					"pprUpdateControl": {
-					    "description": "defines how to update PPRs via ES6",
-					    "type": "boolean"
-					},
-					"ppr1": {
-					    "description": "Indicator for PPR1 'Disabling of this Profile is not allowed'",
-					    "type": "boolean"
-					},
-					"ppr2": {
-					    "description": "Indicator for PPR2 'Deletion of this Profile is not allowed'",
-					    "type": "boolean"
-					},
-					"allowedOperators": {
-					    "description": "list of allowed operaters, see also GSMA SGP.22, section 2.9.2.1",
-					    "type": "array",
-					    "items": {
-						"mccMnc": {
-						    "description": "MCC and MNC coded as defined in 3GPP TS 24.008",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"gid1": {
-						    "description": "referring to content of EF GID1 (file identifier '6F3E') as defined in 3GPP TS 31.102",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"gid2": {
-						    "description": "referring to content of EF GID2 (file identifier '6F3F') as defined in 3GPP TS 31.102",
-						    "type": "string",
-						    "pattern": "^[0-9,A-F]{2,32}$"
-						},
-						"required": [
-						    "mccMnc"
-						]
-					    }
-					},
-					"consentRequired": {
-					    "description": "indicates that the End User consent is required",
-					    "type": "boolean"
-					},
-					"required": [
-					    "pprUpdateControl",
-					    "ppr1",
-					    "ppr2",
-					    "allowedOperators",
-					    "consentRequired"
-					]
-				    }
-				}
-			    }
-			},{
-			    "configureAutoEnableResult": {
-				"description": "configureAutoEnableResult (automatic profile enabeling) PSMO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "insufficientMemory",
-					 "commandError",
-					 "undefinedError"]
-			    }
-			},{
-			    "addEimResult": {
-				"description": "addEimResult eCO result",
-				"type": "object",
-				"properties" : {
-				    "addEimResultCode": {
-					"description": "overall status code to inform about success or failure",
-					"type": "string",
-					"enum": ["ok",
-						 "insufficientMemory",
-						 "ciPKUnknown",
-						 "invalidAssociationToken",
-						 "counterValueOutOfRange",
-						 "commandError",
-						 "undefinedError",
-						 "malformedResult"]
-				    },
-				    "associationToken": {
-					"description": "resulting association token, see also GSMA SGP.32, section 2.11.1.1.1",
-					"type": "integer"
-				    },
-				    "required": [
-					"addEimResultCode"
-				    ]
-				}
-			    }
-			},{
-			    "deleteEimResult": {
-				"description": "deleteEimResult eCO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "eimNotFound",
-					 "lastEimDeleted",
-					 "commandError",
-					 "undefinedError"]
-			    }
-			},{
-			    "updateEimResult": {
-				"description": "updateEimResult eCO result, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "eimNotFound",
-					 "ciPKUnknown",
-					 "counterValueOutOfRange",
-					 "commandError",
-					 "undefinedError"]
-			    }
-			},{
-			    "listEimResult": {
-				"description": "listEimResult eCO result, see also SGP32Definitions.asn1",
-				"type": "object",
-				"properties" : {
-				    "finalResult": {
-					"description": "overall status code to inform about success or failure",
-					"type": "string",
-					"enum": ["successResult",
-						 "errorResult"]
-				    },
-				    "eimIdList": {
-					"description": "list containing the IDs of all configured eIM servers",
-					"type": "array",
-					"items": {
-					    "eimId": {
-						"description": "eIM ID",
-						"type": "string"
-					    },
-					    "eimIdType": {
-						"description": "specifies the type of the eIM ID",
-						"type": "string",
-						"enum": ["eimIdTypeOid",
-							 "eimIdTypeFqdn",
-							 "eimIdTypeProprietary"]
-					    },
-					    "required": [
-						"eimId"
-					    ]
-					}
-				    },
-				    "required": [
-					"finalResult"
-				    ]
-				}
-			    }
-			},{
-			    "rollbackResult": {
-				"description": "Status code of the execution of a profile rollback maneuver, see also GSMA SGP.32, section 2.11.1.13 and SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["ok",
-					 "undefinedError"]
-			    }
-			},{
-			    "processingTerminated": {
-				"description": "Error code in case the eUICC has terminated the overall eUICC package execution, see also SGP32Definitions.asn1",
-				"type": "string",
-				"enum": ["resultSizeOverflow",
-					 "unknownOrDamagedCommand",
-					 "interruption",
-					 "undefinedError"]
-			    }
-			},{
-			    "notificationResult": {
-				"description": "Status code to indicate that an otherSignedNotification has been received",
-				"type": "string",
-				"enum": ["otherSignedNotification"]
-			    }
-			},{
-			    "cancelSessionResult": {
-				"description": "Status code to indicate that the session has been canceled",
-				"type": "string",
-				"enum": ["ok",
-					 "undefinedError"]
-			    }
-			},{
-			    "profileInstallationResult": {
-				"description": "Final result of a profile download, see also SGP32Definitions.asn1",
-				"type": "object",
-				"properties" : {
-				    "finalResult": {
-					"description": "overall status code to inform about succes or failure",
-					"enum": ["successResult",
-						 "errorResult"]
-				    },
-				    "iccid": {
-					"description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
-					"type": "string",
-					"pattern": "^[0-9,A-F]{2,32}$"
-				    },
-				    "required": [
-					"finalResult"
-				    ]
-				}
-			    }
-			},{
-			    "euiccUpdateResult": {
-				"description": "contains the result of a parameter update in the euicc master data table",
-				"type": "string",
-				"enum": ["ok",
-					 "badParamFormat",
-					 "badParam"]
-			    }
-			},{
-			    "euiccDataResult": {
-				"description": "contains the result of an ipaEuiccDataRequest request (see also GSMA SGP.32, section 2.11.1.2)",
-				"type": "object",
-				"properties" : {
-				    "edrResult": {
-					"description": "status code of the execution of the ipaEuiccDataRequest",
-					"type": "string",
-					"enum": ["ok",
-						 "incorrectTagList",
-						 "euiccCiPKIdNotFound",
-						 "undefinedError"]
-				    },
-				    "euiccData": {
-					"description": "contains the resulting eUICC data objects",
-					"type": "object",
-					"properties" : {
-					    "defaultSmdpAddress": {
-						"description": "see GSMA SGP.32",
-						"type": "string"
-					    },
-					    "euiccInfo1": {
-						"description": "ASN.1 encoded, see GSMA SGP.22",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "euiccInfo2": {
-						"description": "ASN.1 encoded, see GSMA SGP.22 and GSMA SGP.32",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "rootSmdsAddress": {
-						"description": "see GSMA SGP.32",
-						"type": "string"
-					    },
-					    "associationToken": {
-						"description": "see GSMA SGP.32",
-						"type": "integer"
-					    },
-					    "eumCertificate": {
-						"description": "ASN.1 encoded, see GSMA SGP.22",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "euiccCertificate": {
-						"description": "ASN.1 encoded, see GSMA SGP.22",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "ipaCapabilities": {
-						"description": "ASN.1 encoded, see GSMA SGP.32",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "deviceInfo": {
-						"description": "ASN.1 encoded, see GSMA SGP.32",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    },
-					    "notificationsList": {
-						"description": "ASN.1 encoded, see GSMA SGP.32",
-						"type": "string",
-						"pattern": "^[0-9,A-F]{2,32}$"
-					    }
-					}
-				    },
-				    "required": [
-					"edrResult"
-				    ]
-				}
-			    }
-			},{
-			    "procedureError": {
-				"description": "indicates a problem that lead to a termination of a procedure",
-				"type": "string",
-				"enum": ["initiateAuthenticationError",
-					 "authenticateResponseError",
-					 "authenticateClientError",
-					 "downloadResponseError",
-					 "getBoundProfilePackageError",
-					 "cancelSessionResponseError",
-					 "handleNotificationError",
-					 "euiccSignatureInvalid",
-					 "undefinedError",
-					 "badPsmo",
-					 "badEco",
-					 "badEdr",
-					 "badOrder",
-					 "abortedOrder",
-					 "stuckOrder",
-					 "noshowOrder"]
-			    }
-			}
-		    ]
-		}
-	    },
-	    "debuginfo": {
-		"description": "Erlang ETS encoded debug information string, for debugging/diagnosis only",
-		"type": "string",
-		"pattern": "^[0-9,A-F]{2,32}$"
-	    },
-	    "required": [
-		"status"
-	    ]
-	}
+  "$id": "https://onomondo.com/schemas/response",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "REST API response",
+  "type": "object",
+  "properties": {
+    "status": {
+      "description": "general processing status of the order",
+      "type": "string",
+      "enum": [
+        "new",
+        "work",
+        "done",
+        "deleted",
+        "absent"
+      ]
+    },
+    "timestamp": {
+      "description": "unix-timestamp of the last status update",
+      "type": "string"
+    },
+    "resource": {
+      "$ref": "/schemas/resource"
+    },
+    "outcome": {
+      "description": "specific result if the executed order",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "anyOf": [
+            {
+              "enableResult": {
+                "description": "profile enable PSMO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "iccidOrAidNotFound",
+                  "profileNotInDisabledState",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "disableResult": {
+                "description": "profile disable PSMO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "iccidOrAidNotFound",
+                  "profileNotInEnabledState",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "deleteResult": {
+                "description": "profile delete PSMO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "iccidOrAidNotFound",
+                  "profileNotInDisabledState",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "listProfileInfoResult": {
+                "description": "listProfileInfoResult PSMO result, see also SGP32Definitions.asn1",
+                "type": "object",
+                "properties": {
+                  "finalResult": {
+                    "description": "overall status code to inform about success or failure",
+                    "type": "string",
+                    "enum": [
+                      "successResult",
+                      "errorResult"
+                    ]
+                  },
+                  "profileInfoList": {
+                    "description": "contains a list of installed profiles and their meta data, see also RSPDefinitions.asn1",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "iccid": {
+                          "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "isdpAid": {
+                          "description": "AID of the ISDP (identifies a profile)",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "profileState": {
+                          "description": "usage state of the prifle",
+                          "type": "string",
+                          "enum": [
+                            "disabled",
+                            "enabled"
+                          ]
+                        },
+                        "profileNickname": {
+                          "description": "human readable nickname name of the profile",
+                          "type": "string"
+                        },
+                        "serviceProviderName": {
+                          "description": "human readable name of the related service provider",
+                          "type": "string"
+                        },
+                        "profileName": {
+                          "description": "human readable name of the profile",
+                          "type": "string"
+                        },
+                        "iconType": {
+                          "description": "graphics format in which the profile icon is supplied",
+                          "type": "string"
+                        },
+                        "icon": {
+                          "description": "icon graphic",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "profileClass": {
+                          "description": "0=test, 1=provisioning, 2=operational",
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "finalResult"
+                  ]
+                }
+              }
+            },
+            {
+              "getRATResult": {
+                "description": "getRAT (rules authorization table) PSMO result, see also RSPDefinitions.asn1",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pprUpdateControl": {
+                      "description": "defines how to update PPRs via ES6",
+                      "type": "boolean"
+                    },
+                    "ppr1": {
+                      "description": "Indicator for PPR1 'Disabling of this Profile is not allowed'",
+                      "type": "boolean"
+                    },
+                    "ppr2": {
+                      "description": "Indicator for PPR2 'Deletion of this Profile is not allowed'",
+                      "type": "boolean"
+                    },
+                    "allowedOperators": {
+                      "description": "list of allowed operaters, see also GSMA SGP.22, section 2.9.2.1",
+                      "type": "array",
+                      "items": {
+                        "mccMnc": {
+                          "description": "MCC and MNC coded as defined in 3GPP TS 24.008",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "gid1": {
+                          "description": "referring to content of EF GID1 (file identifier '6F3E') as defined in 3GPP TS 31.102",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "gid2": {
+                          "description": "referring to content of EF GID2 (file identifier '6F3F') as defined in 3GPP TS 31.102",
+                          "type": "string",
+                          "pattern": "^[0-9,A-F]{2,32}$"
+                        },
+                        "required": [
+                          "mccMnc"
+                        ]
+                      }
+                    },
+                    "consentRequired": {
+                      "description": "indicates that the End User consent is required",
+                      "type": "boolean"
+                    },
+                    "required": [
+                      "pprUpdateControl",
+                      "ppr1",
+                      "ppr2",
+                      "allowedOperators",
+                      "consentRequired"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "configureAutoEnableResult": {
+                "description": "configureAutoEnableResult (automatic profile enabeling) PSMO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "insufficientMemory",
+                  "commandError",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "addEimResult": {
+                "description": "addEimResult eCO result",
+                "type": "object",
+                "properties": {
+                  "addEimResultCode": {
+                    "description": "overall status code to inform about success or failure",
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "insufficientMemory",
+                      "ciPKUnknown",
+                      "invalidAssociationToken",
+                      "counterValueOutOfRange",
+                      "commandError",
+                      "undefinedError",
+                      "malformedResult"
+                    ]
+                  },
+                  "associationToken": {
+                    "description": "resulting association token, see also GSMA SGP.32, section 2.11.1.1.1",
+                    "type": "integer"
+                  },
+                  "required": [
+                    "addEimResultCode"
+                  ]
+                }
+              }
+            },
+            {
+              "deleteEimResult": {
+                "description": "deleteEimResult eCO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "eimNotFound",
+                  "lastEimDeleted",
+                  "commandError",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "updateEimResult": {
+                "description": "updateEimResult eCO result, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "eimNotFound",
+                  "ciPKUnknown",
+                  "counterValueOutOfRange",
+                  "commandError",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "listEimResult": {
+                "description": "listEimResult eCO result, see also SGP32Definitions.asn1",
+                "type": "object",
+                "properties": {
+                  "finalResult": {
+                    "description": "overall status code to inform about success or failure",
+                    "type": "string",
+                    "enum": [
+                      "successResult",
+                      "errorResult"
+                    ]
+                  },
+                  "eimIdList": {
+                    "description": "list containing the IDs of all configured eIM servers",
+                    "type": "array",
+                    "items": {
+                      "eimId": {
+                        "description": "eIM ID",
+                        "type": "string"
+                      },
+                      "eimIdType": {
+                        "description": "specifies the type of the eIM ID",
+                        "type": "string",
+                        "enum": [
+                          "eimIdTypeOid",
+                          "eimIdTypeFqdn",
+                          "eimIdTypeProprietary"
+                        ]
+                      },
+                      "required": [
+                        "eimId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "finalResult"
+                  ]
+                }
+              }
+            },
+            {
+              "rollbackResult": {
+                "description": "Status code of the execution of a profile rollback maneuver, see also GSMA SGP.32, section 2.11.1.13 and SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "processingTerminated": {
+                "description": "Error code in case the eUICC has terminated the overall eUICC package execution, see also SGP32Definitions.asn1",
+                "type": "string",
+                "enum": [
+                  "resultSizeOverflow",
+                  "unknownOrDamagedCommand",
+                  "interruption",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "notificationResult": {
+                "description": "Status code to indicate that an otherSignedNotification has been received",
+                "type": "string",
+                "enum": [
+                  "otherSignedNotification"
+                ]
+              }
+            },
+            {
+              "cancelSessionResult": {
+                "description": "Status code to indicate that the session has been canceled",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "undefinedError"
+                ]
+              }
+            },
+            {
+              "profileInstallationResult": {
+                "description": "Final result of a profile download, see also SGP32Definitions.asn1",
+                "type": "object",
+                "properties": {
+                  "finalResult": {
+                    "description": "overall status code to inform about succes or failure",
+                    "enum": [
+                      "successResult",
+                      "errorResult"
+                    ]
+                  },
+                  "iccid": {
+                    "description": "ICCID of the profile. (ICCID in nibble-swapped raw format)",
+                    "type": "string",
+                    "pattern": "^[0-9,A-F]{2,32}$"
+                  },
+                  "required": [
+                    "finalResult"
+                  ]
+                }
+              }
+            },
+            {
+              "euiccUpdateResult": {
+                "description": "contains the result of a parameter update in the euicc master data table",
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "badParamFormat",
+                  "badParam"
+                ]
+              }
+            },
+            {
+              "euiccDataResult": {
+                "description": "contains the result of an ipaEuiccDataRequest request (see also GSMA SGP.32, section 2.11.1.2)",
+                "type": "object",
+                "properties": {
+                  "edrResult": {
+                    "description": "status code of the execution of the ipaEuiccDataRequest",
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "incorrectTagList",
+                      "euiccCiPKIdNotFound",
+                      "undefinedError"
+                    ]
+                  },
+                  "euiccData": {
+                    "description": "contains the resulting eUICC data objects",
+                    "type": "object",
+                    "properties": {
+                      "defaultSmdpAddress": {
+                        "description": "see GSMA SGP.32",
+                        "type": "string"
+                      },
+                      "euiccInfo1": {
+                        "description": "ASN.1 encoded, see GSMA SGP.22",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "euiccInfo2": {
+                        "description": "ASN.1 encoded, see GSMA SGP.22 and GSMA SGP.32",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "rootSmdsAddress": {
+                        "description": "see GSMA SGP.32",
+                        "type": "string"
+                      },
+                      "associationToken": {
+                        "description": "see GSMA SGP.32",
+                        "type": "integer"
+                      },
+                      "eumCertificate": {
+                        "description": "ASN.1 encoded, see GSMA SGP.22",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "euiccCertificate": {
+                        "description": "ASN.1 encoded, see GSMA SGP.22",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "ipaCapabilities": {
+                        "description": "ASN.1 encoded, see GSMA SGP.32",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "deviceInfo": {
+                        "description": "ASN.1 encoded, see GSMA SGP.32",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      },
+                      "notificationsList": {
+                        "description": "ASN.1 encoded, see GSMA SGP.32",
+                        "type": "string",
+                        "pattern": "^[0-9,A-F]{2,32}$"
+                      }
+                    }
+                  },
+                  "required": [
+                    "edrResult"
+                  ]
+                }
+              }
+            },
+            {
+              "procedureError": {
+                "description": "indicates a problem that lead to a termination of a procedure",
+                "type": "string",
+                "enum": [
+                  "initiateAuthenticationError",
+                  "authenticateResponseError",
+                  "authenticateClientError",
+                  "downloadResponseError",
+                  "getBoundProfilePackageError",
+                  "cancelSessionResponseError",
+                  "handleNotificationError",
+                  "euiccSignatureInvalid",
+                  "undefinedError",
+                  "badPsmo",
+                  "badEco",
+                  "badEdr",
+                  "badOrder",
+                  "abortedOrder",
+                  "stuckOrder",
+                  "noshowOrder"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "debuginfo": {
+        "description": "Erlang ETS encoded debug information string, for debugging/diagnosis only",
+        "type": "string",
+        "pattern": "^[0-9,A-F]{2,32}$"
+      },
+      "required": [
+        "status"
+      ]
     }
+  }
 }
-

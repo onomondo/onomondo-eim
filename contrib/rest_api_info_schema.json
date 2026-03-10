@@ -1,61 +1,61 @@
 {
-    "$id": "https://onomondo.com/schemas/info",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "REST API info",
-    "type": "object",
-    "properties": {
-	"hostname": {
-	    "description": "hostname of the machine where onomondo-eim is running on",
-	    "type": "string"
-	},
-	"node": {
-	    "description": "erlang node name of the onomondo-eim instance",
-	    "type": "string"
-	},
-	"vsn": {
-	    "description": "version number of the onomondo-eim instance",
-	    "type": "string"
-	},
-	"eimId": {
-	    "description": "eIM identifier (see also GSMA GSP.32)",
-	    "type": "string"
-	},
-	"esipaIp": {
-	    "description": "IP-Address where the ESipa interface is bound to",
-	    "type": "string"
-	},
-	"esipaPort": {
-	    "description": "IP-Port where the ESipa interface is bound to",
-	    "type": "string"
-	},
-	"esipaSslCert": {
-	    "description": "SSL certificate that is used for the ESipa interface (HTTPS)",
-	    "type": "string"
-	},
-	"eimCert": {
-	    "description": "eIM certificate (used for creating signatures)",
-	    "type": "string"
-	},
-	"rootCiCerts": {
-	    "description": "List of configured eUICC root CI certificates",
-	    "type": "array",
-	    "items": {
-		"type": "string"
-	    }
-	},
-	"addInitialEimRequest": {
-	    "description": "ASN.1 encoded eIM configuration (see also GSMA SGP.32)",
-	    "type": "string",
-	    "pattern": "^[0-9,A-F]{2,32}$"
-	},
-	"eimConfigurationData": {
-	    "description": "ASN.1 encoded eIM configuration (see also GSMA SGP.32)",
-	    "type": "string",
-	    "pattern": "^[0-9,A-F]{2,32}$"
-	},
-	"counterValue": {
-	    "description": "Initial counter value for signature generation (see also GSMA SGP.32)",
-	    "type": "integer"
-	}
+  "$id": "https://onomondo.com/schemas/info",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "REST API info",
+  "type": "object",
+  "properties": {
+    "hostname": {
+      "description": "hostname of the machine where onomondo-eim is running on",
+      "type": "string"
+    },
+    "node": {
+      "description": "erlang node name of the onomondo-eim instance",
+      "type": "string"
+    },
+    "version": {
+      "description": "version number of the onomondo-eim instance",
+      "type": "string"
+    },
+    "eimId": {
+      "description": "eIM identifier (see also GSMA GSP.32)",
+      "type": "string"
+    },
+    "esipaIp": {
+      "description": "IP-Address where the ESipa interface is bound to",
+      "type": "string"
+    },
+    "esipaPort": {
+      "description": "IP-Port where the ESipa interface is bound to",
+      "type": "string"
+    },
+    "esipaSslCert": {
+      "description": "SSL certificate that is used for the ESipa interface (HTTPS)",
+      "type": "string"
+    },
+    "eimCert": {
+      "description": "eIM certificate (used for creating signatures)",
+      "type": "string"
+    },
+    "rootCiCerts": {
+      "description": "List of configured eUICC root CI certificates",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "addInitialEimRequest": {
+      "description": "ASN.1 encoded eIM configuration (see also GSMA SGP.32)",
+      "type": "string",
+      "pattern": "^[0-9,A-F]{2,32}$"
+    },
+    "eimConfigurationData": {
+      "description": "ASN.1 encoded eIM configuration (see also GSMA SGP.32)",
+      "type": "string",
+      "pattern": "^[0-9,A-F]{2,32}$"
+    },
+    "counterValue": {
+      "description": "Initial counter value for signature generation (see also GSMA SGP.32)",
+      "type": "integer"
     }
+  }
 }
