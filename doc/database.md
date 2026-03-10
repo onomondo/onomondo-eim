@@ -59,7 +59,7 @@ child process that the HTTP server creates when the connection is made. It is im
 the connection open until the procedure has ended. This means that each request that is part of the current
 procedure must be done within the same connection. Otherwise the HTTP server will generate a new child process
 for each request and it will not be possible to match the request with an entry in the `work` table. However, in ESipa
-most of the requests contain a `tranactionId`. In case the `pid` of the HTTP server child process can not be matched,
+most of the requests contain a `transactionId`. In case the `pid` of the HTTP server child process can not be matched,
 the eIM will automatically search for an entry that matches the `transactionId` from the the request. If found, the
 `pid` in the work table is updated and the procedure may proceed. This mechanism is intended to recover from an
 unintended interruption of a connection.
