@@ -134,4 +134,4 @@ In case the onomondo_eim instance restarts (either normally or due to a system c
 in progress (`status` = `work`) are terminated. Since the `work` table is kept in RAM only it will naturally lose its
 contents. When onomondo-eim restarts it will go through the `rest` table to set the status of each rest resource that
 still has its `status` set to `work` to `done`. To make the REST API user aware of the situation an appropriate
-`procedureError` code is set ase well (`abortedOrder`).
+`procedureError` code is set as well (`abortedOrder`).
